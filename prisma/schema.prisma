@@ -1,14 +1,215 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma schema for TrendScholar
+// Docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// User subscription plan
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+/// Summary status (for async generation)
+enum SummaryStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NextAuth.js Adapter Models (required for Prisma adapter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core Domain Models
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  plan          Plan      @default(FREE)
+
+  // Stripe fields
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+
+  // Timestamps
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts       Account[]
+  sessions       Session[]
+  savedPapers    SavedPaper[]
+  summaries      Summary[]
+  topicsFollowed UserTopic[]
+
+  @@index([plan])
+  @@index([stripeCustomerId])
+}
+
+model Topic {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  papers Paper[]
+  users  UserTopic[]
+
+  @@index([slug])
+}
+
+model Paper {
+  id          String   @id @default(cuid())
+  arxivId     String   @unique /// arXiv identifier (e.g., "2301.00001")
+  title       String
+  abstract    String   @db.Text
+  authors     String[] /// Postgres array of author names
+  pdfUrl      String?
+  publishedAt DateTime
+  updatedAt   DateTime @updatedAt
+
+  // Vector embedding (stored externally in Qdrant/Pinecone; reference ID here)
+  vectorId String? @unique
+
+  // Topic relation
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  // Relations
+  summaries    Summary[]
+  savedByUsers SavedPaper[]
+
+  @@index([arxivId])
+  @@index([publishedAt])
+  @@index([topicId])
+}
+
+model Summary {
+  id      String        @id @default(cuid())
+  content String        @db.Text
+  status  SummaryStatus @default(PENDING)
+
+  // Model/version used to generate summary
+  model String @default("gpt-4o")
+
+  // Token usage (for billing/quota tracking)
+  promptTokens     Int @default(0)
+  completionTokens Int @default(0)
+
+  // Relations
+  paperId String
+  paper   Paper  @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([paperId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Join Tables
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// User's saved/bookmarked papers
+model SavedPaper {
+  id        String   @id @default(cuid())
+  userId    String
+  paperId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paper Paper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, paperId])
+  @@index([userId])
+  @@index([paperId])
+}
+
+/// Topics a user follows
+model UserTopic {
+  id        String   @id @default(cuid())
+  userId    String
+  topicId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@index([userId])
+  @@index([topicId])
 }
