@@ -66,6 +66,7 @@ export const authOptions: NextAuthOptions = {
           select: {
             id: true,
             plan: true,
+            subscriptionStatus: true,
             stripeCustomerId: true,
             stripeSubscriptionId: true,
             stripeCurrentPeriodEnd: true,
@@ -75,7 +76,7 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
           session.user.id = dbUser.id;
           session.user.plan = dbUser.plan;
-          session.user.subscriptionStatus = getSubscriptionStatus(dbUser);
+          session.user.subscriptionStatus = mapDbStatusToSessionStatus(dbUser.subscriptionStatus);
         }
       }
       return session;
@@ -93,26 +94,28 @@ export const authOptions: NextAuthOptions = {
 };
 
 /**
- * Derive subscription status from user data
+ * Map database SubscriptionStatus enum to session status string.
+ * Simplifies the Stripe statuses to 4 states for frontend consumption.
  */
-function getSubscriptionStatus(user: {
-  plan: Plan;
-  stripeSubscriptionId: string | null;
-  stripeCurrentPeriodEnd: Date | null;
-}): "active" | "inactive" | "past_due" | "canceled" {
-  if (user.plan === "FREE") {
-    return "active"; // Free tier is always "active"
+function mapDbStatusToSessionStatus(
+  dbStatus: "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "UNPAID" | "INCOMPLETE" | "INCOMPLETE_EXPIRED" | "PAUSED"
+): "active" | "inactive" | "past_due" | "canceled" {
+  switch (dbStatus) {
+    case "ACTIVE":
+    case "TRIALING":
+      return "active";
+    case "PAST_DUE":
+      return "past_due";
+    case "CANCELED":
+    case "UNPAID":
+    case "INCOMPLETE_EXPIRED":
+      return "canceled";
+    case "INCOMPLETE":
+    case "PAUSED":
+      return "inactive";
+    default:
+      return "active";
   }
-
-  if (!user.stripeSubscriptionId) {
-    return "inactive";
-  }
-
-  if (user.stripeCurrentPeriodEnd && user.stripeCurrentPeriodEnd < new Date()) {
-    return "past_due";
-  }
-
-  return "active";
 }
 
 export default authOptions;

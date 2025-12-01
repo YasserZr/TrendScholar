@@ -29,6 +29,18 @@ enum SummaryStatus {
   FAILED
 }
 
+/// Stripe subscription status (synced from webhooks)
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // NextAuth.js Adapter Models (required for Prisma adapter)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,10 +97,11 @@ model User {
   plan          Plan      @default(FREE)
 
   // Stripe fields
-  stripeCustomerId       String?   @unique
-  stripeSubscriptionId   String?   @unique
+  stripeCustomerId       String?            @unique
+  stripeSubscriptionId   String?            @unique
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
+  subscriptionStatus     SubscriptionStatus @default(ACTIVE)
 
   // Timestamps
 

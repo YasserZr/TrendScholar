@@ -280,7 +280,7 @@ export async function createBillingPortalSession({
  * @param subscriptionId - Stripe subscription ID
  * @param customerId - Stripe customer ID
  * @param priceId - Current price ID
- * @param status - Subscription status
+ * @param status - Subscription status from Stripe
  * @param currentPeriodEnd - End of current billing period
  */
 export async function syncSubscriptionToDatabase({
@@ -299,7 +299,10 @@ export async function syncSubscriptionToDatabase({
   // Determine plan from price ID
   const plan = getPlanFromPriceId(priceId);
 
-  // Only consider "active" or "trialing" as valid subscription states
+  // Map Stripe status to our SubscriptionStatus enum
+  const subscriptionStatus = mapStripeStatusToSubscriptionStatus(status);
+
+  // Only consider "active" or "trialing" as valid subscription states for plan access
   const isActiveSubscription = status === "active" || status === "trialing";
 
   await prisma.user.update({
@@ -308,9 +311,30 @@ export async function syncSubscriptionToDatabase({
       stripeSubscriptionId: subscriptionId,
       stripePriceId: priceId,
       stripeCurrentPeriodEnd: currentPeriodEnd,
+      subscriptionStatus: subscriptionStatus,
       plan: isActiveSubscription ? plan : "FREE",
     },
   });
+}
+
+/**
+ * Map Stripe subscription status to our SubscriptionStatus enum.
+ * Stripe statuses: active, canceled, incomplete, incomplete_expired, past_due, paused, trialing, unpaid
+ */
+export function mapStripeStatusToSubscriptionStatus(
+  stripeStatus: Stripe.Subscription.Status
+): "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "UNPAID" | "INCOMPLETE" | "INCOMPLETE_EXPIRED" | "PAUSED" {
+  const statusMap: Record<Stripe.Subscription.Status, "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "UNPAID" | "INCOMPLETE" | "INCOMPLETE_EXPIRED" | "PAUSED"> = {
+    active: "ACTIVE",
+    trialing: "TRIALING",
+    past_due: "PAST_DUE",
+    canceled: "CANCELED",
+    unpaid: "UNPAID",
+    incomplete: "INCOMPLETE",
+    incomplete_expired: "INCOMPLETE_EXPIRED",
+    paused: "PAUSED",
+  };
+  return statusMap[stripeStatus] ?? "ACTIVE";
 }
 
 /**
@@ -326,6 +350,7 @@ export async function cancelSubscription(customerId: string): Promise<void> {
       stripeSubscriptionId: null,
       stripePriceId: null,
       stripeCurrentPeriodEnd: null,
+      subscriptionStatus: "CANCELED",
       plan: "FREE",
     },
   });
