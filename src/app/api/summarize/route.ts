@@ -10,6 +10,7 @@ import {
   SummarizationError,
   type PaperSummary,
 } from "@/lib/openai";
+import { fetchSimilarPapersForRAG, upsertPaperEmbedding } from "@/lib/vector";
 import type { Plan } from "@/generated/prisma/client";
 
 export const runtime = "nodejs"; // Required for Prisma
@@ -380,15 +381,36 @@ export async function POST(
     const fullText = await fetchPdfText(paper.pdfUrl);
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 8. Fetch Related Papers for Context (RAG-style)
+    // 8. Fetch Related Papers for Context (RAG via Vector Search)
     // ─────────────────────────────────────────────────────────────────────────
     let relatedContexts: { title: string; abstract: string }[] = [];
 
-    if (paper.topic) {
-      // Get a few related papers from the same topic
+    try {
+      // Use vector search to find semantically similar papers
+      const similarPapers = await fetchSimilarPapersForRAG({
+        paperId: paper.id,
+        topK: 3,
+      });
+
+      if (similarPapers.length > 0) {
+        relatedContexts = similarPapers.map((p) => ({
+          title: p.title,
+          abstract: p.abstract.slice(0, 500),
+        }));
+        console.log(
+          `[summarize] Found ${similarPapers.length} similar papers via vector search`
+        );
+      }
+    } catch (vectorError) {
+      // Vector search is optional - fall back to topic-based if it fails
+      console.warn("[summarize] Vector search failed, falling back to topic-based:", vectorError);
+    }
+
+    // Fallback: If vector search returned nothing, use topic-based retrieval
+    if (relatedContexts.length === 0 && paper.topic) {
       const relatedPapers = await prisma.paper.findMany({
         where: {
-          topicId: paper.topic ? { not: null } : undefined,
+          topicId: { not: null },
           id: { not: paper.id },
         },
         select: {
@@ -461,7 +483,25 @@ export async function POST(
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 11. Return Success Response
+    // 11. Upsert Paper Embedding (async, non-blocking)
+    // ─────────────────────────────────────────────────────────────────────────
+    // Index the paper for future vector searches
+    // This runs in the background and doesn't block the response
+    upsertPaperEmbedding({
+      paperId: paper.id,
+      text: `${paper.title}\n\n${paper.abstract}`,
+      metadata: {
+        title: paper.title,
+        arxivId: paper.arxivId,
+        topicId: paper.topic?.name,
+      },
+    }).catch((err) => {
+      // Log but don't fail the request
+      console.error("[summarize] Failed to upsert paper embedding:", err);
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 12. Return Success Response
     // ─────────────────────────────────────────────────────────────────────────
     return NextResponse.json(
       {
