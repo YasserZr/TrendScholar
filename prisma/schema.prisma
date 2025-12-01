@@ -120,10 +120,15 @@ model User {
 }
 
 model Topic {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  slug        String  @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
   description String?
+  keywords    String[] /// Keywords for this topic (e.g., ["neural networks", "deep learning"])
+
+  /// Trend data for charts: JSON array of { date: string, count: number }
+  /// Example: [{"date":"2024-01","count":42},{"date":"2024-02","count":58}]
+  trendData Json?
 
   // Timestamps
   createdAt DateTime @default(now())
