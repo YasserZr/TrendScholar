@@ -2,10 +2,10 @@
 // Pricing page for plan upgrades
 
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Header, Footer } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckoutButton } from "@/components/pricing";
 import { checkSubscription } from "@/lib/checkSubscription";
 import type { Metadata } from "next";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 const plans = [
   {
-    name: "FREE",
+    name: "FREE" as const,
     price: "$0",
     description: "Get started with basic features",
     features: [
@@ -27,10 +27,9 @@ const plans = [
     ],
     cta: "Current Plan",
     highlighted: false,
-    stripePriceId: null,
   },
   {
-    name: "PRO",
+    name: "PRO" as const,
     price: "$9",
     period: "/month",
     description: "For serious researchers",
@@ -44,10 +43,9 @@ const plans = [
     ],
     cta: "Upgrade to Pro",
     highlighted: true,
-    stripePriceId: process.env.STRIPE_PRO_PRICE_ID,
   },
   {
-    name: "PLUS",
+    name: "PLUS" as const,
     price: "$29",
     period: "/month",
     description: "For teams and power users",
@@ -62,12 +60,11 @@ const plans = [
     ],
     cta: "Upgrade to Plus",
     highlighted: false,
-    stripePriceId: process.env.STRIPE_PLUS_PRICE_ID,
   },
 ];
 
 export default async function PricingPage() {
-  const { user, plan, isAuthenticated } = await checkSubscription();
+  const { plan: currentPlan, isAuthenticated } = await checkSubscription();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -85,8 +82,8 @@ export default async function PricingPage() {
 
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((planItem) => {
-            const isCurrentPlan = isAuthenticated && plan === planItem.name;
-            const canUpgrade = isAuthenticated && !isCurrentPlan && planItem.stripePriceId;
+            const isCurrentPlan = isAuthenticated && currentPlan === planItem.name;
+            const canUpgrade = isAuthenticated && !isCurrentPlan && planItem.name !== "FREE";
 
             return (
               <Card
@@ -145,22 +142,12 @@ export default async function PricingPage() {
                       Current Plan
                     </Button>
                   ) : canUpgrade ? (
-                    <form action="/api/stripe/checkout" method="POST">
-                      <input
-                        type="hidden"
-                        name="priceId"
-                        value={planItem.stripePriceId || ""}
-                      />
-                      <Button
-                        type="submit"
-                        className={`w-full ${
-                          planItem.highlighted ? "bg-blue-600 hover:bg-blue-700" : ""
-                        }`}
-                        variant={planItem.highlighted ? "default" : "outline"}
-                      >
-                        {planItem.cta}
-                      </Button>
-                    </form>
+                    <CheckoutButton
+                      plan={planItem.name as "PRO" | "PLUS"}
+                      highlighted={planItem.highlighted}
+                    >
+                      {planItem.cta}
+                    </CheckoutButton>
                   ) : !isAuthenticated && planItem.name !== "FREE" ? (
                     <Button asChild className="w-full" variant={planItem.highlighted ? "default" : "outline"}>
                       <Link href="/auth/signin?callbackUrl=/pricing">
