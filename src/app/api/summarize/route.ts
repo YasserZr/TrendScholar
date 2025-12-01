@@ -13,6 +13,8 @@ import {
 import { fetchSimilarPapersForRAG, upsertPaperEmbedding } from "@/lib/vector";
 import { getPlanLimits, isUnlimited, PlanError, PlanErrorCode } from "@/lib/plans";
 import { assertCanSummarize } from "@/lib/plan-assertions";
+import { createApiLogger, withTiming } from "@/lib/log";
+import { captureError, captureAIError, addBreadcrumb, flush } from "@/lib/sentry";
 import type { Plan } from "@/generated/prisma/client";
 
 export const runtime = "nodejs"; // Required for Prisma
@@ -93,7 +95,7 @@ async function fetchPdfText(pdfUrl: string | null): Promise<string | undefined> 
   // - External service (AWS Textract, Google Document AI)
   // - Pre-processed text stored in database
   
-  console.log(`[summarize] PDF extraction not implemented for: ${pdfUrl}`);
+  // PDF extraction not yet implemented
   return undefined;
 }
 
@@ -167,11 +169,19 @@ function parseSummaryContent(content: string): PaperSummary | null {
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<SummarizeSuccessResponse | SummarizeErrorResponse>> {
+  const log = createApiLogger("summarize");
+  const startTime = Date.now();
+
   try {
     // ─────────────────────────────────────────────────────────────────────────
     // 1. Authentication
     // ─────────────────────────────────────────────────────────────────────────
     const { user, plan } = await requireAuth();
+    
+    // Add user context to logger
+    const userLog = log.withUser(user.id);
+    userLog.request("POST", "/api/summarize", { plan });
+    addBreadcrumb("Summarize request", "api", { userId: user.id, plan });
 
     // ─────────────────────────────────────────────────────────────────────────
     // 2. Plan & Rate Limit Check (using centralized plan system)
@@ -339,13 +349,15 @@ export async function POST(
           title: p.title,
           abstract: p.abstract.slice(0, 500),
         }));
-        console.log(
-          `[summarize] Found ${similarPapers.length} similar papers via vector search`
-        );
+        userLog.debug(`Found similar papers via vector search`, { 
+          count: similarPapers.length 
+        });
       }
     } catch (vectorError) {
       // Vector search is optional - fall back to topic-based if it fails
-      console.warn("[summarize] Vector search failed, falling back to topic-based:", vectorError);
+      userLog.warn(`Vector search failed, falling back to topic-based`, { 
+        error: (vectorError as Error).message 
+      });
     }
 
     // Fallback: If vector search returned nothing, use topic-based retrieval
@@ -383,7 +395,17 @@ export async function POST(
     } catch (error) {
       // Handle summarization-specific errors
       if (error instanceof SummarizationError) {
-        console.error(`[summarize] SummarizationError: ${error.code}`, error.message);
+        userLog.error(`Summarization failed`, error, { 
+          code: error.code, 
+          paperId 
+        });
+        
+        // Capture AI errors
+        captureAIError(error, {
+          operation: "summarize_paper",
+          model: "gpt-4o-mini",
+          userId: user.id,
+        });
 
         // Map error codes to HTTP status codes
         const statusCode = error.code.startsWith("OPENAI_429")
@@ -439,7 +461,16 @@ export async function POST(
       },
     }).catch((err) => {
       // Log but don't fail the request
-      console.error("[summarize] Failed to upsert paper embedding:", err);
+      userLog.warn(`Failed to upsert paper embedding`, { error: err.message });
+    });
+
+    // Log success
+    const durationMs = Date.now() - startTime;
+    userLog.ai("summarize", {
+      paperId: paper.id,
+      arxivId: paper.arxivId,
+      durationMs,
+      tokens: result.usage.totalTokens,
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -502,8 +533,15 @@ export async function POST(
       );
     }
 
-    // Log and return generic error
-    console.error("[POST /api/summarize] Unexpected error:", error);
+    // Log and capture unexpected errors
+    log.error("Unexpected error in summarize API", error as Error);
+    captureError(error, {
+      service: "api:summarize",
+      operation: "summarize_paper",
+    });
+    
+    // Flush Sentry events
+    await flush();
 
     return NextResponse.json(
       {

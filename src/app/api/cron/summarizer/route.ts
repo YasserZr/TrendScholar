@@ -10,6 +10,8 @@ import {
   type PaperSummary,
 } from "@/lib/openai";
 import { fetchSimilarPapersForRAG } from "@/lib/vector";
+import { createCronLogger } from "@/lib/log";
+import { captureCronError, captureAIError, addBreadcrumb, flush } from "@/lib/sentry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes max for Vercel Pro
@@ -99,9 +101,10 @@ function sleep(ms: number): Promise<void> {
  */
 function validateCronSecret(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
+  const log = createCronLogger("summarizer");
   
   if (!cronSecret) {
-    console.warn("[summarizer] CRON_SECRET not configured");
+    log.warn("CRON_SECRET not configured");
     return false;
   }
 
@@ -334,17 +337,13 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<SummarizerResult>> {
   const startTime = Date.now();
+  const log = createCronLogger("summarizer");
 
   // ─────────────────────────────────────────────────────────────────────────
   // 1. Validate Secret Token
   // ─────────────────────────────────────────────────────────────────────────
   if (!validateCronSecret(request)) {
-    console.error("[summarizer] Unauthorized request");
-
-    // TODO: Alert on unauthorized attempts
-    // if (process.env.SENTRY_DSN) {
-    //   Sentry.captureMessage("Unauthorized summarizer cron attempt", "warning");
-    // }
+    log.warn("Unauthorized cron request", { reason: "invalid_or_missing_secret" });
 
     return NextResponse.json(
       {
@@ -369,7 +368,8 @@ export async function GET(
     );
   }
 
-  console.log("[summarizer] Starting summarization run");
+  log.cron("summarizer", "start", { batchSize: SUMMARIZER_CONFIG.batchSize });
+  addBreadcrumb("Summarizer cron started", "cron", { jobName: "summarizer" });
 
   const stats = {
     papersProcessed: 0,
@@ -398,10 +398,13 @@ export async function GET(
       systemUserId
     );
 
-    console.log(`[summarizer] Found ${papers.length} papers to summarize`);
+    log.info(`Found papers to summarize`, { count: papers.length });
 
     if (papers.length === 0) {
-      console.log("[summarizer] No papers need summarization");
+      log.cron("summarizer", "complete", { 
+        durationMs: Date.now() - startTime, 
+        reason: "no_papers_to_process" 
+      });
       return NextResponse.json({
         success: true,
         stats,
@@ -422,7 +425,10 @@ export async function GET(
       const remainingMs = (maxDuration * 1000) - elapsedMs - 30000;
       
       if (remainingMs < 10000) {
-        console.log("[summarizer] Approaching timeout, stopping early");
+        log.warn("Approaching timeout, stopping early", { 
+          elapsedMs, 
+          papersProcessed: stats.papersProcessed 
+        });
         break;
       }
 
@@ -430,20 +436,25 @@ export async function GET(
 
       // Skip papers with very short abstracts
       if (paper.abstract.length < SUMMARIZER_CONFIG.minAbstractLength) {
-        console.log(`[summarizer] Skipping ${paper.arxivId}: abstract too short`);
+        log.debug(`Skipping paper: abstract too short`, { 
+          arxivId: paper.arxivId, 
+          abstractLength: paper.abstract.length 
+        });
         stats.papersSkipped++;
         continue;
       }
 
-      console.log(
-        `[summarizer] Processing ${stats.papersProcessed}/${papers.length}: ${paper.arxivId}`
-      );
+      log.cron("summarizer", "progress", {
+        current: stats.papersProcessed,
+        total: papers.length,
+        arxivId: paper.arxivId,
+      });
 
       const result = await summarizePaperWithRetry(paper, systemUserId);
 
       if (result.success) {
         stats.summariesCreated++;
-        console.log(`[summarizer] ✓ Summarized ${paper.arxivId}`);
+        log.ai("summarize", { arxivId: paper.arxivId, status: "success" });
       } else {
         stats.summariesFailed++;
         stats.errors.push({
@@ -452,7 +463,13 @@ export async function GET(
           error: result.error || "Unknown error",
           code: result.code,
         });
-        console.log(`[summarizer] ✗ Failed ${paper.arxivId}: ${result.error}`);
+        log.ai("summarize", { arxivId: paper.arxivId, status: "failed", error: result.error });
+        
+        // Capture AI errors to Sentry
+        captureAIError(new Error(result.error || "Summarization failed"), {
+          operation: "summarize_paper",
+          model: "gpt-4o-mini",
+        });
       }
 
       // Delay between papers (except for the last one)
@@ -463,12 +480,13 @@ export async function GET(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("[summarizer] Fatal error:", errorMessage);
+    log.error("Summarizer job failed", error as Error, { stats });
 
-    // TODO: Send to Sentry
-    // if (process.env.SENTRY_DSN) {
-    //   Sentry.captureException(error);
-    // }
+    captureCronError(error, {
+      jobName: "summarizer",
+      itemsProcessed: stats.papersProcessed,
+      itemsFailed: stats.summariesFailed,
+    });
 
     stats.errors.push({
       paperId: "",
@@ -480,19 +498,16 @@ export async function GET(
 
   const duration = Date.now() - startTime;
 
-  console.log(`[summarizer] Completed in ${duration}ms:`, {
+  log.cron("summarizer", "complete", {
+    durationMs: duration,
     papersProcessed: stats.papersProcessed,
     summariesCreated: stats.summariesCreated,
     summariesFailed: stats.summariesFailed,
     papersSkipped: stats.papersSkipped,
   });
 
-  // TODO: Send metrics to monitoring
-  // if (process.env.DATADOG_API_KEY) {
-  //   statsd.gauge("summarizer.papers_processed", stats.papersProcessed);
-  //   statsd.gauge("summarizer.summaries_created", stats.summariesCreated);
-  //   statsd.gauge("summarizer.duration_ms", duration);
-  // }
+  // Flush Sentry events before response (important for serverless)
+  await flush();
 
   return NextResponse.json({
     success: stats.summariesFailed === 0,

@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { upsertPaperEmbedding } from "@/lib/vector";
+import { createCronLogger, withTiming } from "@/lib/log";
+import { captureCronError, addBreadcrumb, flush } from "@/lib/sentry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes max for Vercel Pro
@@ -361,12 +363,13 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<CollectorResult>> {
   const startTime = Date.now();
+  const log = createCronLogger("collector");
 
   // ─────────────────────────────────────────────────────────────────────────
   // 1. Validate Secret Token
   // ─────────────────────────────────────────────────────────────────────────
   if (!validateCronSecret(request)) {
-    console.error("[collector] Unauthorized request");
+    log.warn("Unauthorized cron request", { reason: "invalid_or_missing_secret" });
     return NextResponse.json(
       {
         success: false,
@@ -385,7 +388,14 @@ export async function GET(
     );
   }
 
-  console.log("[collector] Starting paper collection run");
+  log.cron("collector", "start", { 
+    config: {
+      maxPapersPerCategory: COLLECTOR_CONFIG.maxPapersPerCategory,
+      maxTotalPapers: COLLECTOR_CONFIG.maxTotalPapers,
+      daysToLookBack: COLLECTOR_CONFIG.daysToLookBack,
+    }
+  });
+  addBreadcrumb("Collector cron started", "cron", { jobName: "collector" });
 
   const stats = {
     categoriesProcessed: 0,
@@ -411,7 +421,10 @@ export async function GET(
     for (const [slug, config] of Object.entries(ARXIV_CATEGORIES)) {
       // Check if we've hit the total limit
       if (stats.papersFound >= COLLECTOR_CONFIG.maxTotalPapers) {
-        console.log("[collector] Reached total paper limit, stopping");
+        log.info("Reached total paper limit, stopping", { 
+          papersFound: stats.papersFound, 
+          limit: COLLECTOR_CONFIG.maxTotalPapers 
+        });
         break;
       }
 
@@ -421,6 +434,8 @@ export async function GET(
           await sleep(COLLECTOR_CONFIG.rateLimitDelayMs);
         }
 
+        log.debug(`Fetching papers for category: ${config.arxivCode}`, { slug, arxivCode: config.arxivCode });
+
         const entries = await fetchArxivPapers(
           config.arxivCode,
           COLLECTOR_CONFIG.maxPapersPerCategory,
@@ -428,6 +443,11 @@ export async function GET(
         );
 
         stats.papersFound += entries.length;
+        log.info(`Fetched papers for ${config.arxivCode}`, { 
+          category: config.arxivCode, 
+          papersFound: entries.length 
+        });
+        
         const topicId = topicMap.get(config.arxivCode) || null;
 
         // Process each paper
@@ -460,7 +480,10 @@ export async function GET(
             }
           } catch (paperError) {
             const errorMsg = `Failed to upsert paper ${entry.id}: ${paperError}`;
-            console.error(`[collector] ${errorMsg}`);
+            log.error(`Failed to upsert paper`, paperError as Error, { 
+              arxivId: entry.id, 
+              category: config.arxivCode 
+            });
             stats.errors.push(errorMsg);
           }
         }
@@ -468,7 +491,14 @@ export async function GET(
         stats.categoriesProcessed++;
       } catch (categoryError) {
         const errorMsg = `Failed to fetch category ${config.arxivCode}: ${categoryError}`;
-        console.error(`[collector] ${errorMsg}`);
+        log.error(`Failed to fetch category`, categoryError as Error, { 
+          category: config.arxivCode 
+        });
+        captureCronError(categoryError, {
+          jobName: "collector",
+          operation: "fetch_category",
+          itemsProcessed: stats.categoriesProcessed,
+        });
         stats.errors.push(errorMsg);
       }
     }
@@ -477,7 +507,7 @@ export async function GET(
     // 4. Generate Embeddings (in batches)
     // ─────────────────────────────────────────────────────────────────────────
     if (COLLECTOR_CONFIG.generateEmbeddings && papersToEmbed.length > 0) {
-      console.log(`[collector] Generating embeddings for ${papersToEmbed.length} papers`);
+      log.info(`Generating embeddings`, { papersCount: papersToEmbed.length });
 
       for (let i = 0; i < papersToEmbed.length; i += COLLECTOR_CONFIG.embeddingBatchSize) {
         const batch = papersToEmbed.slice(i, i + COLLECTOR_CONFIG.embeddingBatchSize);
@@ -492,10 +522,10 @@ export async function GET(
               });
               stats.embeddingsGenerated++;
             } catch (embeddingError) {
-              console.error(
-                `[collector] Failed to embed paper ${paper.paperId}:`,
-                embeddingError
-              );
+              log.warn(`Failed to embed paper`, { 
+                paperId: paper.paperId, 
+                error: (embeddingError as Error).message 
+              });
               // Don't add to errors array - embeddings are optional
             }
           })
@@ -511,22 +541,33 @@ export async function GET(
     // ─────────────────────────────────────────────────────────────────────────
     // 5. Update Topic Trend Data
     // ─────────────────────────────────────────────────────────────────────────
+    log.info("Updating topic trends");
     await updateTopicTrends();
 
   } catch (error) {
     const errorMsg = `Collector error: ${error}`;
-    console.error(`[collector] ${errorMsg}`);
+    log.error("Collector job failed", error as Error, { stats });
+    captureCronError(error, {
+      jobName: "collector",
+      itemsProcessed: stats.categoriesProcessed,
+      itemsFailed: stats.errors.length,
+    });
     stats.errors.push(errorMsg);
   }
 
   const duration = Date.now() - startTime;
 
-  console.log(`[collector] Completed in ${duration}ms:`, {
+  log.cron("collector", "complete", {
+    durationMs: duration,
     categoriesProcessed: stats.categoriesProcessed,
     papersInserted: stats.papersInserted,
     papersUpdated: stats.papersUpdated,
     embeddingsGenerated: stats.embeddingsGenerated,
+    errorsCount: stats.errors.length,
   });
+
+  // Flush Sentry events before response (important for serverless)
+  await flush();
 
   return NextResponse.json({
     success: stats.errors.length === 0,
@@ -544,7 +585,8 @@ export async function GET(
  * Calculates monthly paper counts for the last 12 months
  */
 async function updateTopicTrends(): Promise<void> {
-  console.log("[collector] Updating topic trends");
+  const log = createCronLogger("collector");
+  log.debug("Updating topic trends");
 
   const topics = await prisma.topic.findMany({
     select: { id: true },
@@ -575,7 +617,7 @@ async function updateTopicTrends(): Promise<void> {
         data: { trendData: trendJson },
       });
     } catch (error) {
-      console.error(`[collector] Failed to update trends for topic ${topic.id}:`, error);
+      log.warn(`Failed to update trends for topic`, { topicId: topic.id, error: (error as Error).message });
     }
   }
 }

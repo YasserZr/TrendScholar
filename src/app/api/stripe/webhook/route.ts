@@ -10,6 +10,8 @@ import {
   mapStripeStatusToSubscriptionStatus,
   PLAN_PRICE_MAP,
 } from "@/lib/stripe";
+import { createWebhookLogger } from "@/lib/log";
+import { capturePaymentError, addBreadcrumb, flush } from "@/lib/sentry";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -65,6 +67,8 @@ interface WebhookResult {
  * - paused → PAUSED (billing paused)
  */
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult>> {
+  const log = createWebhookLogger("stripe");
+
   // ─────────────────────────────────────────────────────────────────────────
   // 1. Read raw body and signature header
   // ─────────────────────────────────────────────────────────────────────────
@@ -72,7 +76,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
   try {
     body = await req.text();
   } catch (err) {
-    console.error("[Webhook] Failed to read request body:", err);
+    log.error("Failed to read request body", err as Error);
     return NextResponse.json(
       { success: false, event: "unknown", error: "Failed to read request body" },
       { status: 400 }
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
 
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
-    console.error("[Webhook] Missing stripe-signature header");
+    log.warn("Missing stripe-signature header");
     return NextResponse.json(
       { success: false, event: "unknown", error: "Missing stripe-signature header" },
       { status: 400 }
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
   // ─────────────────────────────────────────────────────────────────────────
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error("[Webhook] STRIPE_WEBHOOK_SECRET is not configured");
+    log.error("STRIPE_WEBHOOK_SECRET is not configured");
     return NextResponse.json(
       { success: false, event: "unknown", error: "Webhook secret not configured" },
       { status: 500 }
@@ -108,15 +112,19 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[Webhook] Signature verification failed: ${message}`);
+    log.error(`Signature verification failed`, err as Error);
     return NextResponse.json(
       { success: false, event: "unknown", error: `Signature verification failed: ${message}` },
       { status: 400 }
     );
   }
 
-  // Log the event type for debugging
-  console.log(`[Webhook] Received event: ${event.type} (${event.id})`);
+  // Log the event for debugging
+  log.payment(event.type, { eventId: event.id });
+  addBreadcrumb("Stripe webhook received", "payment", { 
+    eventType: event.type, 
+    eventId: event.id 
+  });
 
   // ─────────────────────────────────────────────────────────────────────────
   // 4. Process event based on type
@@ -132,7 +140,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
         
         // Only process subscription checkouts (not one-time payments)
         if (session.mode !== "subscription" || !session.subscription) {
-          console.log(`[Webhook] Skipping non-subscription checkout: ${session.id}`);
+          log.info(`Skipping non-subscription checkout`, { sessionId: session.id });
           return NextResponse.json({
             success: true,
             event: event.type,
@@ -145,7 +153,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
           session.subscription as string
         ) as unknown as Stripe.Subscription;
 
-        const result = await handleSubscriptionChange(subscription, "checkout_completed");
+        const result = await handleSubscriptionChange(subscription, "checkout_completed", log);
         
         return NextResponse.json({
           success: true,
@@ -161,7 +169,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
       // ─────────────────────────────────────────────────────────────────────
       case "customer.subscription.created": {
         const subscription = event.data.object as Stripe.Subscription;
-        const result = await handleSubscriptionChange(subscription, "created");
+        const result = await handleSubscriptionChange(subscription, "created", log);
         
         return NextResponse.json({
           success: true,
@@ -185,11 +193,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
           if (previousAttributes.status) changes.push(`status: ${previousAttributes.status} → ${subscription.status}`);
           if (previousAttributes.items) changes.push("items changed");
           if (changes.length > 0) {
-            console.log(`[Webhook] Subscription ${subscription.id} changes: ${changes.join(", ")}`);
+            log.info(`Subscription updated`, { 
+              subscriptionId: subscription.id, 
+              changes: changes.join(", ") 
+            });
           }
         }
 
-        const result = await handleSubscriptionChange(subscription, "updated");
+        const result = await handleSubscriptionChange(subscription, "updated", log);
         
         return NextResponse.json({
           success: true,
@@ -209,7 +220,10 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
         
         await cancelSubscription(customerId);
         
-        console.log(`[Webhook] Subscription deleted for customer ${customerId}, downgraded to FREE`);
+        log.payment("subscription_canceled", { 
+          customerId, 
+          action: "downgraded_to_free" 
+        });
         
         return NextResponse.json({
           success: true,
@@ -233,7 +247,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
           : subscriptionRef?.id;
 
         if (!subscriptionId) {
-          console.log(`[Webhook] Invoice ${invoice.id} is not subscription-related, skipping`);
+          log.info(`Invoice is not subscription-related, skipping`, { invoiceId: invoice.id });
           return NextResponse.json({
             success: true,
             event: event.type,
@@ -246,7 +260,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
           subscriptionId
         ) as unknown as Stripe.Subscription;
 
-        const result = await handleSubscriptionChange(subscription, "payment_succeeded");
+        const result = await handleSubscriptionChange(subscription, "payment_succeeded", log);
         
         return NextResponse.json({
           success: true,
@@ -278,10 +292,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
             subscriptionId
           ) as unknown as Stripe.Subscription;
 
-          await handleSubscriptionChange(subscription, "payment_failed");
+          await handleSubscriptionChange(subscription, "payment_failed", log);
         }
         
-        console.warn(`[Webhook] Payment failed for customer ${customerId}, invoice ${invoice.id}`);
+        log.warn(`Payment failed`, { 
+          customerId, 
+          invoiceId: invoice.id,
+          subscriptionId 
+        });
+        
+        // Capture payment failures as important events
+        capturePaymentError(new Error("Invoice payment failed"), {
+          stripeEventId: event.id,
+          stripeEventType: event.type,
+          customerId,
+        });
         
         return NextResponse.json({
           success: true,
@@ -296,7 +321,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
       // Log for visibility but don't fail
       // ─────────────────────────────────────────────────────────────────────
       default:
-        console.log(`[Webhook] Unhandled event type: ${event.type}`);
+        log.debug(`Unhandled event type`, { eventType: event.type });
         return NextResponse.json({
           success: true,
           event: event.type,
@@ -305,7 +330,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Webhook] Error processing ${event.type}:`, error);
+    log.error(`Error processing webhook`, error as Error, { eventType: event.type });
+    
+    // Capture to Sentry
+    capturePaymentError(error, {
+      stripeEventId: event.id,
+      stripeEventType: event.type,
+    });
+    
+    // Flush Sentry events
+    await flush();
     
     // Return 500 to trigger Stripe retry
     return NextResponse.json(
@@ -325,7 +359,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookResult
  */
 async function handleSubscriptionChange(
   subscription: Stripe.Subscription,
-  trigger: string
+  trigger: string,
+  log: ReturnType<typeof createWebhookLogger>
 ): Promise<string> {
   const customerId = subscription.customer as string;
   const priceId = subscription.items.data[0]?.price.id ?? "";
@@ -346,7 +381,7 @@ async function handleSubscriptionChange(
   });
 
   if (!user) {
-    console.error(`[Webhook] No user found for Stripe customer: ${customerId}`);
+    log.error(`No user found for Stripe customer`, undefined, { customerId });
     throw new Error(`No user found for Stripe customer: ${customerId}`);
   }
 
@@ -360,7 +395,12 @@ async function handleSubscriptionChange(
   });
 
   const result = `${trigger}: user=${user.id} plan=${plan} status=${subscriptionStatus}`;
-  console.log(`[Webhook] ${result}`);
+  log.payment("subscription_synced", { 
+    trigger, 
+    userId: user.id, 
+    plan, 
+    status: subscriptionStatus 
+  });
   
   return result;
 }
