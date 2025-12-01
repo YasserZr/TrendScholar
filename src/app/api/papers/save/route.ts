@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { PlanError } from "@/lib/plans";
+import { assertCanSavePaper } from "@/lib/plan-assertions";
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,27 +61,34 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Get user's plan to check limits
+      // Get user's plan to check limits using centralized plan system
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { plan: true },
+        select: { id: true, plan: true },
       });
 
-      if (user?.plan === "FREE") {
-        const savedCount = await prisma.savedPaper.count({
-          where: { userId },
-        });
+      if (!user) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
+      }
 
-        if (savedCount >= 10) {
+      // Use centralized assertion helper
+      try {
+        await assertCanSavePaper(user);
+      } catch (error) {
+        if (error instanceof PlanError) {
           return NextResponse.json(
             {
-              error: "Save limit reached",
-              message: "Free users can save up to 10 papers. Upgrade to PRO for more.",
-              code: "LIMIT_REACHED",
+              error: error.message,
+              code: error.code,
+              details: error.details,
             },
-            { status: 403 }
+            { status: error.statusCode }
           );
         }
+        throw error;
       }
 
       // Save the paper

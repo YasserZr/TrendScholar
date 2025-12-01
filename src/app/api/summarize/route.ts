@@ -3,7 +3,7 @@
 // Returns 403 for FREE users, includes daily rate limiting
 
 import { NextRequest, NextResponse } from "next/server";
-import { checkSubscription, SubscriptionError, requireAuth } from "@/lib/checkSubscription";
+import { requireAuth, checkSubscription, SubscriptionError } from "@/lib/checkSubscription";
 import prisma from "@/lib/prisma";
 import {
   summarizePaperText,
@@ -11,25 +11,11 @@ import {
   type PaperSummary,
 } from "@/lib/openai";
 import { fetchSimilarPapersForRAG, upsertPaperEmbedding } from "@/lib/vector";
+import { getPlanLimits, isUnlimited, PlanError, PlanErrorCode } from "@/lib/plans";
+import { assertCanSummarize } from "@/lib/plan-assertions";
 import type { Plan } from "@/generated/prisma/client";
 
 export const runtime = "nodejs"; // Required for Prisma
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Rate Limit Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Daily summarization limits by plan
- * 
- * Strategy: Count summaries created by user in the last 24 hours
- * Simple and effective for MVP, can be upgraded to Redis later
- */
-const DAILY_LIMITS: Record<Plan, number> = {
-  FREE: 0,    // No access
-  PRO: 10,    // 10 summaries per day
-  PLUS: 50,   // 50 summaries per day
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -81,45 +67,14 @@ interface SummarizeErrorResponse {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Get the start of the current rate limit window (24 hours ago)
- */
-function getRateLimitWindowStart(): Date {
-  const now = new Date();
-  return new Date(now.getTime() - 24 * 60 * 60 * 1000);
-}
-
-/**
- * Get when the rate limit resets (24 hours from oldest summary in window)
+ * Get when the rate limit resets (next midnight UTC)
  */
 function getRateLimitResetTime(): Date {
   const now = new Date();
-  return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-}
-
-/**
- * Check user's daily rate limit
- */
-async function checkRateLimit(
-  userId: string,
-  plan: Plan
-): Promise<{ allowed: boolean; used: number; limit: number; resetsAt: Date }> {
-  const limit = DAILY_LIMITS[plan];
-  const windowStart = getRateLimitWindowStart();
-
-  // Count summaries created in the last 24 hours
-  const used = await prisma.summary.count({
-    where: {
-      userId,
-      createdAt: { gte: windowStart },
-    },
-  });
-
-  return {
-    allowed: used < limit,
-    used,
-    limit,
-    resetsAt: getRateLimitResetTime(),
-  };
+  const tomorrow = new Date(now);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  tomorrow.setUTCHours(0, 0, 0, 0);
+  return tomorrow;
 }
 
 /**
@@ -219,55 +174,42 @@ export async function POST(
     const { user, plan } = await requireAuth();
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 2. Plan Check (FREE blocked)
+    // 2. Plan & Rate Limit Check (using centralized plan system)
     // ─────────────────────────────────────────────────────────────────────────
-    if (plan === "FREE") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Summarization requires a PRO or PLUS subscription",
-          code: "PREMIUM_REQUIRED",
-          details: {
-            currentPlan: plan,
-            upgradeUrl: "/pricing",
+    let rateLimitInfo: { used: number; limit: number; remaining: number };
+    
+    try {
+      rateLimitInfo = await assertCanSummarize({ id: user.id, plan });
+    } catch (error) {
+      if (error instanceof PlanError) {
+        const resetsAt = getRateLimitResetTime();
+        return NextResponse.json(
+          {
+            success: false,
+            error: error.message,
+            code: error.code,
+            details: {
+              ...error.details,
+              resetsAt: resetsAt.toISOString(),
+              upgradeUrl: "/pricing",
+            },
           },
-        },
-        { status: 403 }
-      );
+          {
+            status: error.statusCode,
+            headers: error.code === PlanErrorCode.RATE_LIMIT_EXCEEDED ? {
+              "X-RateLimit-Limit": String(error.details?.limit || 0),
+              "X-RateLimit-Remaining": "0",
+              "X-RateLimit-Reset": resetsAt.toISOString(),
+              "Retry-After": String(Math.ceil((resetsAt.getTime() - Date.now()) / 1000)),
+            } : undefined,
+          }
+        );
+      }
+      throw error;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 3. Rate Limit Check
-    // ─────────────────────────────────────────────────────────────────────────
-    const rateLimit = await checkRateLimit(user.id, plan);
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Daily summarization limit reached (${rateLimit.limit} per day)`,
-          code: "RATE_LIMIT_EXCEEDED",
-          details: {
-            limit: rateLimit.limit,
-            used: rateLimit.used,
-            resetsAt: rateLimit.resetsAt.toISOString(),
-            plan,
-          },
-        },
-        {
-          status: 429,
-          headers: {
-            "X-RateLimit-Limit": String(rateLimit.limit),
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": rateLimit.resetsAt.toISOString(),
-            "Retry-After": String(Math.ceil((rateLimit.resetsAt.getTime() - Date.now()) / 1000)),
-          },
-        }
-      );
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // 4. Parse and Validate Request Body
+    // 3. Parse and Validate Request Body
     // ─────────────────────────────────────────────────────────────────────────
     let body: SummarizeRequest;
     try {
@@ -367,9 +309,9 @@ export async function POST(
             totalTokens: existingSummary.promptTokens + existingSummary.completionTokens,
           },
           rateLimit: {
-            limit: rateLimit.limit,
-            remaining: rateLimit.limit - rateLimit.used,
-            resetsAt: rateLimit.resetsAt.toISOString(),
+            limit: rateLimitInfo.limit,
+            remaining: rateLimitInfo.remaining,
+            resetsAt: getRateLimitResetTime().toISOString(),
           },
         });
       }
@@ -526,16 +468,16 @@ export async function POST(
           totalTokens: result.usage.totalTokens,
         },
         rateLimit: {
-          limit: rateLimit.limit,
-          remaining: rateLimit.limit - rateLimit.used - 1, // -1 for this request
-          resetsAt: rateLimit.resetsAt.toISOString(),
+          limit: rateLimitInfo.limit,
+          remaining: isUnlimited(rateLimitInfo.limit) ? -1 : Math.max(0, rateLimitInfo.remaining - 1), // -1 for this request
+          resetsAt: getRateLimitResetTime().toISOString(),
         },
       },
       {
         headers: {
-          "X-RateLimit-Limit": String(rateLimit.limit),
-          "X-RateLimit-Remaining": String(rateLimit.limit - rateLimit.used - 1),
-          "X-RateLimit-Reset": rateLimit.resetsAt.toISOString(),
+          "X-RateLimit-Limit": String(rateLimitInfo.limit),
+          "X-RateLimit-Remaining": String(isUnlimited(rateLimitInfo.limit) ? -1 : Math.max(0, rateLimitInfo.remaining - 1)),
+          "X-RateLimit-Reset": getRateLimitResetTime().toISOString(),
         },
       }
     );
@@ -648,8 +590,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get rate limit info
-    const rateLimit = await checkRateLimit(user.id, plan!);
+    // Get rate limit info using the new plan system
+    const limits = getPlanLimits(plan);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const usedToday = await prisma.summary.count({
+      where: { userId: user.id, createdAt: { gte: todayStart } },
+    });
 
     // Transform summaries
     const transformedSummaries = summaries.map((s) => {
@@ -677,10 +624,10 @@ export async function GET(request: NextRequest) {
         hasMore: page * pageSize < total,
       },
       rateLimit: {
-        limit: rateLimit.limit,
-        used: rateLimit.used,
-        remaining: Math.max(0, rateLimit.limit - rateLimit.used),
-        resetsAt: rateLimit.resetsAt.toISOString(),
+        limit: limits.dailySummaries,
+        used: usedToday,
+        remaining: isUnlimited(limits.dailySummaries) ? -1 : Math.max(0, limits.dailySummaries - usedToday),
+        resetsAt: getRateLimitResetTime().toISOString(),
       },
       isPremium: isProOrPlus,
     });

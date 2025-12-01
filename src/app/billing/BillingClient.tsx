@@ -150,7 +150,7 @@ export function BillingClient({
             <div className="flex-1 min-w-[200px]">
               <p className="text-sm text-muted-foreground mb-2">Plan Features</p>
               <ul className="space-y-1">
-                {PLANS[currentPlan].features.slice(0, 3).map((feature) => (
+                {PLANS[currentPlan].featureList.slice(0, 3).map((feature) => (
                   <li key={feature} className="flex items-center gap-2 text-sm">
                     <CheckIcon className="h-4 w-4 text-green-500" />
                     {feature}
@@ -227,7 +227,7 @@ export function BillingClient({
                   </div>
 
                   <ul className="space-y-2">
-                    {plan.features.map((feature) => (
+                    {plan.featureList.map((feature) => (
                       <li key={feature} className="flex items-start gap-2 text-sm">
                         <CheckIcon className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                         <span>{feature}</span>

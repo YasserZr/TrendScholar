@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { Header, Footer } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { checkSubscription } from "@/lib/checkSubscription";
+import { getPlanFeatures } from "@/lib/plans";
+import { getUserUsageStats } from "@/lib/plan-assertions";
 import {
   getFeedPapers,
   getDashboardStats,
