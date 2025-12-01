@@ -1,0 +1,11 @@
+{
+  "name": "trendscholar-tests",
+  "description": "Test suite for TrendScholar",
+  "scripts": {
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:api": "vitest run tests/api",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage"
+  }
+}
