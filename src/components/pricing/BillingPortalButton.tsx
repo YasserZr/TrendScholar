@@ -11,6 +11,13 @@ interface BillingPortalButtonProps {
   className?: string;
 }
 
+interface PortalResponse {
+  success: boolean;
+  portalUrl?: string;
+  error?: string;
+  code?: string;
+}
+
 export function BillingPortalButton({
   returnUrl,
   children,
@@ -18,9 +25,11 @@ export function BillingPortalButton({
   className,
 }: BillingPortalButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePortal = async () => {
     setIsLoading(true);
+    setError(null);
 
     try {
       const response = await fetch("/api/stripe/portal", {
@@ -31,32 +40,40 @@ export function BillingPortalButton({
         body: JSON.stringify({ returnUrl }),
       });
 
-      const data = await response.json();
+      const data: PortalResponse = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         throw new Error(data.error || "Failed to open billing portal");
       }
 
       // Redirect to Stripe Billing Portal
-      if (data.url) {
-        window.location.href = data.url;
+      if (data.portalUrl) {
+        window.location.href = data.portalUrl;
+      } else {
+        throw new Error("No portal URL returned");
       }
-    } catch (error) {
-      console.error("Billing portal error:", error);
-      alert(error instanceof Error ? error.message : "Something went wrong");
+    } catch (err) {
+      console.error("Billing portal error:", err);
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Button
-      onClick={handlePortal}
-      disabled={isLoading}
-      variant={variant}
-      className={className}
-    >
-      {isLoading ? "Loading..." : children}
-    </Button>
+    <div className={className}>
+      <Button
+        onClick={handlePortal}
+        disabled={isLoading}
+        variant={variant}
+        className="w-full"
+      >
+        {isLoading ? "Redirecting..." : children}
+      </Button>
+      {error && (
+        <p className="text-sm text-red-500 mt-2 text-center">{error}</p>
+      )}
+    </div>
   );
 }

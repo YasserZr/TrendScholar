@@ -9,11 +9,26 @@ import { createBillingPortalSession, StripeError } from "@/lib/stripe";
  * POST /api/stripe/portal
  * Creates a Stripe Billing Portal session for subscription management.
  * 
- * Request body (optional):
- * - returnUrl: Custom return URL (defaults to /dashboard)
+ * @security
+ * - Requires authentication via NextAuth session
+ * - Requires existing Stripe customer (must have subscribed before)
+ * - Validates returnUrl to prevent open redirect attacks
  * 
- * Returns:
- * - url: Billing portal URL to redirect user to
+ * Request body (optional):
+ * ```json
+ * { "returnUrl": "/dashboard" }
+ * ```
+ * 
+ * Response (200):
+ * ```json
+ * { "success": true, "portalUrl": "https://billing.stripe.com/..." }
+ * ```
+ * 
+ * Error responses:
+ * - 401: Unauthorized (not logged in)
+ * - 400: No Stripe customer exists (never subscribed)
+ * - 404: User not found
+ * - 500: Internal server error
  */
 export async function POST(req: NextRequest) {
   try {
@@ -21,27 +36,48 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Unauthorized", code: "UNAUTHORIZED" },
+        { 
+          success: false,
+          error: "Authentication required", 
+          code: "UNAUTHORIZED" 
+        },
         { status: 401 }
       );
     }
 
     // 2. Parse request body (optional returnUrl)
-    let returnUrl: string;
+    let returnUrl: string = "";
     try {
       const body = await req.json();
-      returnUrl = body.returnUrl;
+      if (body && typeof body.returnUrl === "string") {
+        returnUrl = body.returnUrl;
+      }
     } catch {
-      // Body is optional, use default
-      returnUrl = "";
+      // Body is optional, continue with default
     }
 
-    // 3. Build return URL
+    // 3. Build and validate return URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+    
     if (!returnUrl) {
+      // Default to dashboard
       returnUrl = `${baseUrl}/dashboard`;
-    } else if (!returnUrl.startsWith("http")) {
+    } else if (returnUrl.startsWith("/")) {
+      // Relative path - prepend base URL (safe)
       returnUrl = `${baseUrl}${returnUrl}`;
+    } else if (returnUrl.startsWith(baseUrl)) {
+      // Absolute URL to our domain (safe)
+      // Keep as-is
+    } else {
+      // External URL - reject to prevent open redirect
+      return NextResponse.json(
+        { 
+          success: false,
+          error: "Invalid return URL. Must be a relative path or same-origin URL.", 
+          code: "INVALID_RETURN_URL" 
+        },
+        { status: 400 }
+      );
     }
 
     // 4. Fetch user from database
@@ -52,12 +88,17 @@ export async function POST(req: NextRequest) {
         email: true,
         name: true,
         stripeCustomerId: true,
+        plan: true,
       },
     });
 
     if (!user) {
       return NextResponse.json(
-        { error: "User not found", code: "USER_NOT_FOUND" },
+        { 
+          success: false,
+          error: "User account not found", 
+          code: "USER_NOT_FOUND" 
+        },
         { status: 404 }
       );
     }
@@ -65,7 +106,13 @@ export async function POST(req: NextRequest) {
     // 5. Check if user has a Stripe customer (needed for portal)
     if (!user.stripeCustomerId) {
       return NextResponse.json(
-        { error: "No billing account found. Subscribe to a plan first.", code: "NO_CUSTOMER" },
+        { 
+          success: false,
+          error: "No billing account found. Subscribe to a plan first.", 
+          code: "NO_BILLING_ACCOUNT",
+          suggestion: "Use POST /api/stripe/checkout with a plan to subscribe",
+          currentPlan: user.plan,
+        },
         { status: 400 }
       );
     }
@@ -77,20 +124,40 @@ export async function POST(req: NextRequest) {
     });
 
     // 7. Return portal URL
-    return NextResponse.json({ url: portalSession.url });
+    return NextResponse.json({
+      success: true,
+      portalUrl: portalSession.url,
+    });
+
   } catch (error) {
     console.error("[Stripe Portal Error]", error);
 
     if (error instanceof StripeError) {
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { 
+          success: false,
+          error: error.message, 
+          code: error.code 
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: "Failed to create billing portal session", code: "INTERNAL_ERROR" },
+      { 
+        success: false,
+        error: "Failed to create billing portal session. Please try again.", 
+        code: "INTERNAL_ERROR" 
+      },
       { status: 500 }
     );
   }
+}
+
+// Disallow other methods
+export async function GET() {
+  return NextResponse.json(
+    { success: false, error: "Method not allowed", code: "METHOD_NOT_ALLOWED" },
+    { status: 405, headers: { Allow: "POST" } }
+  );
 }
