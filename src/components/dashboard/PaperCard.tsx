@@ -66,7 +66,7 @@ export function PaperCard({ paper }: PaperCardProps) {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-base font-semibold leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors">
-              <Link href={`/paper/${paper.arxivId}`} className="hover:underline">
+              <Link href={`/papers/${paper.id}`} className="hover:underline">
                 {paper.title}
               </Link>
             </CardTitle>
@@ -135,7 +135,7 @@ export function PaperCard({ paper }: PaperCardProps) {
               </Button>
             )}
             <Button asChild variant="outline" size="sm" className="h-7 px-2 text-xs">
-              <Link href={`/paper/${paper.arxivId}`}>View details</Link>
+              <Link href={`/papers/${paper.id}`}>View details</Link>
             </Button>
           </div>
         </div>
