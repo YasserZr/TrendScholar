@@ -158,7 +158,7 @@ export async function GET(
     // ─────────────────────────────────────────────────────────────────────────
     // 3. Transform and sort data
     // ─────────────────────────────────────────────────────────────────────────
-    let data: TopicResponse[] = topics.map((topic) => ({
+    const data: TopicResponse[] = topics.map((topic) => ({
       id: topic.id,
       name: topic.name,
       slug: topic.slug,
