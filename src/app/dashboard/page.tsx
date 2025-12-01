@@ -1,8 +1,17 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { Header, Footer } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { checkSubscription } from "@/lib/checkSubscription";
+import {
+  getFeedPapers,
+  getDashboardStats,
+  getAllTopics,
+  getUserFollowedTopicIds,
+  type TimeRange,
+} from "@/lib/dashboard";
+import { FilterBar, PaperFeed, StatsCards } from "@/components/dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,7 +19,15 @@ export const metadata: Metadata = {
   description: "Your personalized research dashboard",
 };
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams: Promise<{
+    time?: string;
+    topics?: string;
+    page?: string;
+  }>;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   // Server-side subscription check (includes auth check)
   const { user, plan, isProOrPlus, isFree, isAuthenticated } = await checkSubscription();
 
@@ -18,6 +35,26 @@ export default async function DashboardPage() {
   if (!isAuthenticated || !user) {
     redirect("/landing");
   }
+
+  // Parse search params
+  const params = await searchParams;
+  const timeRange = (params.time || "week") as TimeRange;
+  const topicIds = params.topics ? params.topics.split(",").filter(Boolean) : [];
+  const page = parseInt(params.page || "1", 10);
+
+  // Fetch data in parallel
+  const [feedResult, stats, allTopics, followedTopicIds] = await Promise.all([
+    getFeedPapers({
+      userId: user.id,
+      timeRange,
+      topicIds: topicIds.length > 0 ? topicIds : undefined,
+      page,
+      limit: 12,
+    }),
+    getDashboardStats(user.id),
+    getAllTopics(),
+    getUserFollowedTopicIds(user.id),
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -69,42 +106,54 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Dashboard Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Stats Card */}
-          <div className="rounded-lg border border-border/40 bg-card p-6">
-            <h3 className="text-sm font-medium text-muted-foreground">
-              Saved Papers
-            </h3>
-            <p className="text-3xl font-bold mt-2">0</p>
-            {isFree && (
-              <p className="text-xs text-muted-foreground mt-1">Limit: 10</p>
-            )}
-          </div>
+        {/* Stats Cards */}
+        <StatsCards stats={stats} plan={plan || "FREE"} />
 
-          <div className="rounded-lg border border-border/40 bg-card p-6">
-            <h3 className="text-sm font-medium text-muted-foreground">
-              Summaries Generated
-            </h3>
-            <p className="text-3xl font-bold mt-2">0</p>
-            {isFree && (
-              <p className="text-xs text-muted-foreground mt-1">Limit: 5/month</p>
-            )}
-          </div>
+        {/* Filters */}
+        <Suspense fallback={<div className="h-10 bg-muted/50 rounded animate-pulse mb-6" />}>
+          <FilterBar
+            topics={allTopics}
+            followedTopicIds={followedTopicIds}
+            currentTimeRange={timeRange}
+            currentTopicIds={topicIds}
+          />
+        </Suspense>
 
-          <div className="rounded-lg border border-border/40 bg-card p-6">
-            <h3 className="text-sm font-medium text-muted-foreground">
-              Topics Following
-            </h3>
-            <p className="text-3xl font-bold mt-2">0</p>
-            {isFree && (
-              <p className="text-xs text-muted-foreground mt-1">Limit: 1</p>
-            )}
-          </div>
-        </div>
+        {/* Paper Feed */}
+        <section>
+          <h2 className="text-xl font-semibold mb-4">Your Feed</h2>
+          <PaperFeed papers={feedResult.papers} total={feedResult.total} />
+
+          {/* Pagination */}
+          {feedResult.total > 12 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              {page > 1 && (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={`/dashboard?time=${timeRange}${topicIds.length > 0 ? `&topics=${topicIds.join(",")}` : ""}&page=${page - 1}`}
+                  >
+                    Previous
+                  </Link>
+                </Button>
+              )}
+              <span className="text-sm text-muted-foreground px-4">
+                Page {page} of {Math.ceil(feedResult.total / 12)}
+              </span>
+              {page < Math.ceil(feedResult.total / 12) && (
+                <Button asChild variant="outline" size="sm">
+                  <Link
+                    href={`/dashboard?time=${timeRange}${topicIds.length > 0 ? `&topics=${topicIds.join(",")}` : ""}&page=${page + 1}`}
+                  >
+                    Next
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
 
         {/* Quick Actions */}
-        <div className="mt-8">
+        <div className="mt-12">
           <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Link
@@ -150,17 +199,6 @@ export default async function DashboardPage() {
                 Manage your account and preferences
               </p>
             </Link>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-          <div className="rounded-lg border border-border/40 bg-card p-6">
-            <p className="text-muted-foreground text-center py-8">
-              No recent activity yet. Start exploring papers to see your
-              activity here.
-            </p>
           </div>
         </div>
       </main>
