@@ -103,6 +103,13 @@ model User {
   stripeCurrentPeriodEnd DateTime?
   subscriptionStatus     SubscriptionStatus @default(ACTIVE)
 
+  /// User preferences for notifications and digest
+  /// Example: { "digestFrequency": "daily", "digestEnabled": true, "lastDigestSentAt": "..." }
+  preferences Json?
+
+  /// Last time a digest email was sent to this user
+  lastDigestAt DateTime?
+
   // Timestamps
 
   createdAt DateTime @default(now())
