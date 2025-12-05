@@ -13,9 +13,10 @@ import { generateChatCompletion } from "@/lib/gemini";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ chatId: string }> }
 ) {
   try {
+    const { chatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,7 +32,7 @@ export async function GET(
 
     const chat = await prisma.chat.findFirst({
       where: {
-        id: params.chatId,
+        id: chatId,
         userId: user.id,
       },
       include: {
@@ -75,9 +76,10 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ chatId: string }> }
 ) {
   try {
+    const { chatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -104,7 +106,7 @@ export async function POST(
     // Fetch chat with paper context and message history
     const chat = await prisma.chat.findFirst({
       where: {
-        id: params.chatId,
+        id: chatId,
         userId: user.id,
       },
       include: {
@@ -239,9 +241,10 @@ export async function POST(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ chatId: string }> }
 ) {
   try {
+    const { chatId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -258,7 +261,7 @@ export async function DELETE(
     // Verify ownership
     const chat = await prisma.chat.findFirst({
       where: {
-        id: params.chatId,
+        id: chatId,
         userId: user.id,
       },
     });
@@ -269,7 +272,7 @@ export async function DELETE(
 
     // Delete chat (messages will be cascade deleted)
     await prisma.chat.delete({
-      where: { id: params.chatId },
+      where: { id: chatId },
     });
 
     return NextResponse.json({ success: true });
