@@ -24,34 +24,34 @@ const footerLinks = {
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-border/40 bg-muted/30">
+    <footer className="border-t border-[#BCCCDC] dark:border-slate-800 bg-[#e8f0f8] dark:bg-slate-900">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/landing" className="flex items-center space-x-2 mb-4">
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 TrendScholar
               </span>
             </Link>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-[#64748b] dark:text-slate-400 mb-4">
               AI-powered academic paper summaries and research trends. Stay
               ahead without the overwhelm.
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#9AA6B2] dark:text-slate-500">
               © {new Date().getFullYear()} TrendScholar. All rights reserved.
             </p>
           </div>
 
           {/* Product Links */}
           <div>
-            <h4 className="font-semibold text-sm mb-4">Product</h4>
+            <h4 className="font-semibold text-sm mb-4 text-slate-800 dark:text-white">Product</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-[#64748b] dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -62,13 +62,13 @@ export function LandingFooter() {
 
           {/* Resources Links */}
           <div>
-            <h4 className="font-semibold text-sm mb-4">Resources</h4>
+            <h4 className="font-semibold text-sm mb-4 text-slate-800 dark:text-white">Resources</h4>
             <ul className="space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-[#64748b] dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -79,13 +79,13 @@ export function LandingFooter() {
 
           {/* Company Links */}
           <div>
-            <h4 className="font-semibold text-sm mb-4">Company</h4>
+            <h4 className="font-semibold text-sm mb-4 text-slate-800 dark:text-white">Company</h4>
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-[#64748b] dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
                   >
                     {link.name}
                   </Link>
@@ -96,14 +96,14 @@ export function LandingFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-12 pt-8 border-t border-[#BCCCDC] dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-[#9AA6B2] dark:text-slate-500">
             Built with ❤️ for the research community
           </p>
           <div className="flex items-center gap-6">
             <Link
               href="https://twitter.com/trendscholar"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[#9AA6B2] hover:text-[#64748b] dark:hover:text-slate-300 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -114,7 +114,7 @@ export function LandingFooter() {
             </Link>
             <Link
               href="https://github.com/trendscholar"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[#9AA6B2] hover:text-[#64748b] dark:hover:text-slate-300 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >

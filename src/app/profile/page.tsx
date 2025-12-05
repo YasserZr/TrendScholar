@@ -1,6 +1,6 @@
 // src/app/profile/page.tsx
 import { redirect } from "next/navigation";
-import { Header, Footer } from "@/components/ui";
+import { AuthHeader, Footer } from "@/components/ui";
 import { checkSubscription } from "@/lib/checkSubscription";
 import { ProfileClient } from "./ProfileClient";
 import { getPlanLimits } from "@/lib/plans";
@@ -81,7 +81,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-8">

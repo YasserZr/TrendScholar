@@ -62,13 +62,13 @@ const tiers = [
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="py-24">
+    <section id="pricing" className="py-24 bg-gradient-to-b from-[#e8f0f8] to-[#F8FAFC] dark:from-slate-900/50 dark:to-slate-950">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4 text-slate-800 dark:text-white">
             Simple, transparent pricing
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-[#64748b] dark:text-slate-300">
             Choose the plan that fits your research workflow. All plans include
             a 7-day free trial.
           </p>
@@ -78,7 +78,7 @@ export function PricingSection() {
           {tiers.map((tier) => (
             <Card
               key={tier.id}
-              className={`relative flex flex-col ${
+              className={`relative flex flex-col bg-white dark:bg-slate-800/50 border-[#BCCCDC] dark:border-slate-700 ${
                 tier.highlighted
                   ? "border-blue-600 shadow-lg shadow-blue-600/10 scale-105"
                   : ""

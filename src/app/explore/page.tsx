@@ -1,4 +1,4 @@
-import { Header, Footer } from "@/components/ui";
+import { AuthHeader, Footer } from "@/components/ui";
 import { ExploreClient } from "@/components/explore";
 import type { Metadata } from "next";
 
@@ -54,7 +54,7 @@ export default async function ExplorePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-8">

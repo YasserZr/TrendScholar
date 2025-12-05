@@ -6,6 +6,7 @@
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,14 +18,18 @@ import {
 
 interface UserMenuProps {
   className?: string;
+  showName?: boolean;
 }
 
-export function UserMenu({ className }: UserMenuProps) {
+export function UserMenu({ className, showName = false }: UserMenuProps) {
   const { data: session, status } = useSession();
 
   if (status === "loading") {
     return (
-      <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+        {showName && <div className="h-4 w-20 animate-pulse rounded bg-muted hidden sm:block" />}
+      </div>
     );
   }
 
@@ -33,6 +38,10 @@ export function UserMenu({ className }: UserMenuProps) {
   }
 
   const { user } = session;
+  
+  // Extract username from name or email
+  const displayName = user.name || user.email?.split("@")[0] || "User";
+  
   const initials = user.name
     ? user.name
         .split(" ")
@@ -42,31 +51,46 @@ export function UserMenu({ className }: UserMenuProps) {
         .slice(0, 2)
     : user.email?.[0]?.toUpperCase() || "U";
 
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: "/auth/signin" });
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className={`relative h-9 w-9 rounded-full ${className || ""}`}
+          className={`relative flex items-center gap-2 px-2 ${className || ""}`}
         >
-          {user.image ? (
-            <img
-              src={user.image}
-              alt={user.name || "User avatar"}
-              className="h-9 w-9 rounded-full object-cover"
+          <Avatar className="h-8 w-8">
+            <AvatarImage 
+              src={user.image || undefined} 
+              alt={displayName}
             />
-          ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
               {initials}
-            </div>
+            </AvatarFallback>
+          </Avatar>
+          {showName && (
+            <span className="hidden sm:inline-block text-sm font-medium max-w-[100px] truncate">
+              {displayName}
+            </span>
           )}
+          <svg
+            className="h-4 w-4 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{user.name || displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>
@@ -88,7 +112,7 @@ export function UserMenu({ className }: UserMenuProps) {
                   : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               }`}
             >
-              {user.plan}
+              {user.plan || "FREE"}
             </span>
           </div>
         </DropdownMenuLabel>
@@ -121,9 +145,22 @@ export function UserMenu({ className }: UserMenuProps) {
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          className="text-red-600 dark:text-red-400 cursor-pointer"
-          onClick={() => signOut({ callbackUrl: "/" })}
+          className="text-red-600 dark:text-red-400 cursor-pointer focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950"
+          onClick={handleSignOut}
         >
+          <svg
+            className="mr-2 h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            />
+          </svg>
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

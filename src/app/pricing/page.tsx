@@ -2,7 +2,7 @@
 // Pricing page for plan upgrades
 
 import Link from "next/link";
-import { Header, Footer } from "@/components/ui";
+import { AuthHeader, Footer } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckoutButton } from "@/components/pricing";
@@ -68,7 +68,7 @@ export default async function PricingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-16">
         <div className="text-center mb-12">

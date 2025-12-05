@@ -1,6 +1,6 @@
 // src/app/billing/page.tsx
 import { redirect } from "next/navigation";
-import { Header, Footer } from "@/components/ui";
+import { AuthHeader, Footer } from "@/components/ui";
 import { checkSubscription } from "@/lib/checkSubscription";
 import { BillingClient } from "./BillingClient";
 import type { Metadata } from "next";
@@ -21,7 +21,7 @@ export default async function BillingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-8">

@@ -12,4 +12,4 @@ export {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "./dropdown-menu";
-
+export { ThemeToggle } from "./ThemeToggle";

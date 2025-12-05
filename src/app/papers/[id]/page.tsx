@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { getServerSession } from "next-auth";
-import { Header, Footer } from "@/components/ui";
+import { AuthHeader, Footer } from "@/components/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PaperActions, PaperSummary, RelatedPapers } from "@/components/papers";
@@ -116,7 +116,7 @@ export default async function PaperPage({ params }: PaperPageProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         {/* Breadcrumb */}

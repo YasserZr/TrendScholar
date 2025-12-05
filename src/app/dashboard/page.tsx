@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Header, Footer } from "@/components/ui";
+import { AuthHeader, Footer } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { checkSubscription } from "@/lib/checkSubscription";
 import { getPlanFeatures } from "@/lib/plans";
@@ -60,15 +60,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         {/* Upgrade Banner for FREE users */}
         {isFree && (
-          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950 p-4">
+          <div className="mb-6 rounded-lg border border-[#D9EAFD] bg-[#D9EAFD]/30 dark:border-blue-900 dark:bg-blue-950 p-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                <h3 className="font-semibold text-blue-800 dark:text-blue-100">
                   Upgrade to unlock premium features
                 </h3>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
