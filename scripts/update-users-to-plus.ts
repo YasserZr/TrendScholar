@@ -1,9 +1,7 @@
 // scripts/update-users-to-plus.ts
 // One-time script to update all existing users to PLUS plan during testing
 
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../src/lib/prisma";
 
 async function main() {
   console.log("🔄 Updating all users to PLUS plan for testing...\n");
