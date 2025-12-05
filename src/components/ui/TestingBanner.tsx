@@ -2,18 +2,26 @@
 "use client";
 
 import { BeakerIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { useState } from "react";
-
-/**
- * Testing mode flag - matches TESTING_MODE in checkSubscription.ts
- */
-const TESTING_MODE = process.env.NEXT_PUBLIC_TESTING_MODE === "true";
+import { useState, useEffect } from "react";
 
 export function TestingBanner() {
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Wait for client-side mount to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Don't render anything on server or before mount to avoid hydration issues
+  if (!isMounted) {
+    return null;
+  }
+
+  const isTestingMode = process.env.NEXT_PUBLIC_TESTING_MODE === "true";
 
   // Don't render if not in testing mode or dismissed
-  if (!TESTING_MODE || isDismissed) {
+  if (!isTestingMode || isDismissed) {
     return null;
   }
 

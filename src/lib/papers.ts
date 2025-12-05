@@ -213,8 +213,11 @@ export async function getRelatedPapers(
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   } catch (error) {
-    console.error("Failed to fetch related papers:", error);
-    // Return empty array on error - don't break the page
+    // Silently return empty array on error - don't break the page
+    // This handles cases like OpenAI quota exceeded, network issues, etc.
+    if (process.env.NODE_ENV === "development") {
+      console.warn("Related papers unavailable:", error instanceof Error ? error.message : "Unknown error");
+    }
     return [];
   }
 }

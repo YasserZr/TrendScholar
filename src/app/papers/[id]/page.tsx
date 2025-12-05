@@ -6,7 +6,7 @@ import { getServerSession } from "next-auth";
 import { AuthHeader, Footer } from "@/components/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PaperActions, PaperSummary, RelatedPapers } from "@/components/papers";
+import { PaperActions, PaperSummary, RelatedPapers, GenerateSummaryButton } from "@/components/papers";
 import { getPaperById, getRelatedPapers, isPaperSavedByUser } from "@/lib/papers";
 import { authOptions } from "@/lib/auth";
 import type { Metadata } from "next";
@@ -71,11 +71,17 @@ function formatDate(date: Date): string {
  * Related papers section with Suspense
  */
 async function RelatedPapersSection({ paperId }: { paperId: string }) {
-  const paper = await getPaperById(paperId);
-  if (!paper) return null;
+  try {
+    const paper = await getPaperById(paperId);
+    if (!paper) return null;
 
-  const relatedPapers = await getRelatedPapers(paper, 5);
-  return <RelatedPapers papers={relatedPapers} />;
+    const relatedPapers = await getRelatedPapers(paper, 5);
+    return <RelatedPapers papers={relatedPapers} />;
+  } catch (error) {
+    // Gracefully handle any errors (e.g., OpenAI quota exceeded)
+    console.warn("RelatedPapersSection error:", error instanceof Error ? error.message : "Unknown error");
+    return null;
+  }
 }
 
 /**
@@ -221,11 +227,7 @@ export default async function PaperPage({ params }: PaperPageProps) {
                     No AI summary available for this paper yet.
                   </p>
                   {session?.user ? (
-                    <Button asChild>
-                      <Link href={`/api/summarize?paperId=${paper.id}`}>
-                        Generate Summary
-                      </Link>
-                    </Button>
+                    <GenerateSummaryButton paperId={paper.id} />
                   ) : (
                     <Button asChild variant="outline">
                       <Link href="/auth/signin">Sign in to generate</Link>

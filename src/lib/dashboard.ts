@@ -5,6 +5,9 @@ import prisma from "@/lib/prisma";
 import type { Topic } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 
+// Testing mode - show papers without summaries
+const TESTING_MODE = process.env.TESTING_MODE === "true";
+
 /**
  * Time range options for filtering papers
  */
@@ -73,7 +76,9 @@ export async function getFeedPapers(options: {
   page?: number;
   limit?: number;
 }): Promise<{ papers: FeedPaper[]; total: number }> {
-  const { userId, timeRange = "week", topicIds, page = 1, limit = 10 } = options;
+  // In testing mode, default to "all" time range to show all papers
+  const defaultTimeRange = TESTING_MODE ? "all" : "week";
+  const { userId, timeRange = defaultTimeRange, topicIds, page = 1, limit = 10 } = options;
 
   // Get user's followed topics if no specific topics provided
   let followedTopicIds = topicIds;
@@ -89,22 +94,24 @@ export async function getFeedPapers(options: {
   const dateThreshold = getTimeRangeDate(timeRange);
 
   // Build where clause
-  const whereClause: Prisma.PaperWhereInput = {
-    // Only papers with completed summaries for a richer feed
-    summaries: {
+  const whereClause: Prisma.PaperWhereInput = {};
+
+  // In testing mode, show all papers; otherwise only papers with completed summaries
+  if (!TESTING_MODE) {
+    whereClause.summaries = {
       some: {
         status: "COMPLETED",
       },
-    },
-  };
+    };
+  }
 
   // Add date filter
   if (dateThreshold) {
     whereClause.publishedAt = { gte: dateThreshold };
   }
 
-  // Add topic filter (if user follows topics)
-  if (followedTopicIds && followedTopicIds.length > 0) {
+  // Add topic filter (if user follows topics) - skip in testing mode to show all papers
+  if (!TESTING_MODE && followedTopicIds && followedTopicIds.length > 0) {
     whereClause.topicId = { in: followedTopicIds };
   }
 
