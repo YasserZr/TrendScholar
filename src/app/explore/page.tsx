@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   description: "Discover trending research topics and explore academic paper trends",
 };
 
+// Force dynamic rendering to avoid build-time fetch errors
+export const dynamic = 'force-dynamic';
+
 interface TrendDataPoint {
   date: string;
   count: number;
