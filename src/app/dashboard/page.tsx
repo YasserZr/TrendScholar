@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AuthHeader, Footer } from "@/components/ui";
 import { Button } from "@/components/ui/button";
-import { checkSubscription } from "@/lib/checkSubscription";
+import { checkSubscription, TESTING_MODE } from "@/lib/checkSubscription";
 import { getPlanFeatures } from "@/lib/plans";
 import { getUserUsageStats } from "@/lib/plan-assertions";
 import {
@@ -63,8 +63,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <AuthHeader />
 
       <main className="flex-1 container mx-auto px-4 py-8">
-        {/* Upgrade Banner for FREE users */}
-        {isFree && (
+        {/* Upgrade Banner for FREE users - hidden in testing mode since everyone has Plus features */}
+        {isFree && !TESTING_MODE && (
           <div className="mb-6 rounded-lg border border-[#D9EAFD] bg-[#D9EAFD]/30 dark:border-blue-900 dark:bg-blue-950 p-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>

@@ -4,6 +4,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Testing mode flag - when enabled, billing portal is disabled
+ * Matches TESTING_MODE in checkSubscription.ts
+ */
+const TESTING_MODE = process.env.NEXT_PUBLIC_TESTING_MODE === "true";
+
 interface BillingPortalButtonProps {
   returnUrl?: string;
   children: React.ReactNode;
@@ -28,6 +34,11 @@ export function BillingPortalButton({
   const [error, setError] = useState<string | null>(null);
 
   const handlePortal = async () => {
+    // Prevent portal access during testing mode
+    if (TESTING_MODE) {
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
 
@@ -60,6 +71,21 @@ export function BillingPortalButton({
       setIsLoading(false);
     }
   };
+
+  // In testing mode, show disabled button
+  if (TESTING_MODE) {
+    return (
+      <div className={className}>
+        <Button
+          disabled
+          variant={variant}
+          className="w-full opacity-60 cursor-not-allowed"
+        >
+          🧪 Billing Disabled (Testing)
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>

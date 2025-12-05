@@ -1,11 +1,16 @@
 // src/components/landing/PricingSection.tsx
 "use client";
 
-import { CheckIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, BeakerIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckoutButton } from "@/components/pricing/CheckoutButton";
 import Link from "next/link";
+
+/**
+ * Testing mode flag - matches TESTING_MODE in checkSubscription.ts
+ */
+const TESTING_MODE = process.env.NEXT_PUBLIC_TESTING_MODE === "true";
 
 const tiers = [
   {
@@ -73,6 +78,18 @@ export function PricingSection() {
             a 7-day free trial.
           </p>
         </div>
+
+        {/* Testing Mode Banner */}
+        {TESTING_MODE && (
+          <div className="max-w-2xl mx-auto mb-8 rounded-lg border border-amber-500/50 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4">
+            <div className="flex items-center justify-center gap-3 text-amber-700 dark:text-amber-400">
+              <BeakerIcon className="h-5 w-5 shrink-0" />
+              <p className="text-sm font-medium">
+                <strong>Testing Mode:</strong> All users currently have Plus plan features enabled for free! Sign in to access all premium features.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {tiers.map((tier) => (

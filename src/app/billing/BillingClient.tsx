@@ -5,7 +5,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLANS, type PlanKey } from "@/lib/plans";
-import { CheckIcon, SparklesIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, SparklesIcon, ArrowRightIcon, BeakerIcon } from "@heroicons/react/24/outline";
+
+/**
+ * Testing mode flag - when enabled, plan changes are disabled
+ * Matches TESTING_MODE in checkSubscription.ts
+ */
+const TESTING_MODE = process.env.NEXT_PUBLIC_TESTING_MODE === "true";
 
 interface BillingClientProps {
   currentPlan: PlanKey;
@@ -35,6 +41,12 @@ export function BillingClient({
 
   // Handle plan upgrade/downgrade
   const handlePlanChange = async (targetPlan: PlanKey) => {
+    // Prevent plan changes during testing mode
+    if (TESTING_MODE) {
+      toast.info("Plan changes are disabled during testing. You already have Plus features!");
+      return;
+    }
+    
     if (targetPlan === "FREE") {
       // Downgrade to free - redirect to portal
       handleManageSubscription();
@@ -68,6 +80,12 @@ export function BillingClient({
 
   // Handle billing portal
   const handleManageSubscription = async () => {
+    // Prevent portal access during testing mode
+    if (TESTING_MODE) {
+      toast.info("Billing management is disabled during testing.");
+      return;
+    }
+    
     if (!hasStripeCustomer) {
       toast.error("No subscription to manage. Upgrade to a paid plan first.");
       return;
@@ -121,6 +139,22 @@ export function BillingClient({
 
   return (
     <div className="space-y-8">
+      {/* Testing Mode Notice */}
+      {TESTING_MODE && (
+        <Card className="border-amber-500/50 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <BeakerIcon className="h-5 w-5" />
+              Testing Mode Active
+            </CardTitle>
+            <CardDescription className="text-amber-600 dark:text-amber-300">
+              You have full access to all <strong>Plus plan features</strong> during our testing phase.
+              Payments and plan changes are temporarily disabled. Enjoy exploring all premium features for free!
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {/* Current Plan Summary */}
       <Card className="border-blue-500/50 bg-gradient-to-r from-blue-500/5 to-purple-500/5">
         <CardHeader>
@@ -158,7 +192,7 @@ export function BillingClient({
                 ))}
               </ul>
             </div>
-            {hasStripeCustomer && (
+            {hasStripeCustomer && !TESTING_MODE && (
               <div className="flex items-end">
                 <Button
                   variant="outline"
@@ -239,11 +273,15 @@ export function BillingClient({
                 <CardFooter>
                   <Button
                     className="w-full"
-                    variant={getButtonVariant(planKey)}
-                    disabled={planKey === currentPlan || loadingPlan !== null}
+                    variant={TESTING_MODE && planKey === "PLUS" ? "default" : getButtonVariant(planKey)}
+                    disabled={TESTING_MODE || planKey === currentPlan || loadingPlan !== null}
                     onClick={() => handlePlanChange(planKey)}
                   >
-                    {loadingPlan === planKey
+                    {TESTING_MODE && planKey === "PLUS"
+                      ? "🧪 Active (Testing)"
+                      : TESTING_MODE
+                      ? "Disabled (Testing)"
+                      : loadingPlan === planKey
                       ? "Processing..."
                       : getButtonText(planKey)}
                   </Button>

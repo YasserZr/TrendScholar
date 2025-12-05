@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { TestingBanner } from "@/components/ui/TestingBanner";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -31,7 +32,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
       >
         <ThemeProvider>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            <TestingBanner />
+            {children}
+          </SessionProvider>
         </ThemeProvider>
         <Toaster position="bottom-right" richColors closeButton />
       </body>

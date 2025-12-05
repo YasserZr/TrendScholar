@@ -13,3 +13,4 @@ export {
   DropdownMenuSeparator,
 } from "./dropdown-menu";
 export { ThemeToggle } from "./ThemeToggle";
+export { TestingBanner } from "./TestingBanner";

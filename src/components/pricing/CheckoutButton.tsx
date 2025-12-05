@@ -4,6 +4,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Testing mode flag - when enabled, checkout buttons are disabled
+ * Matches TESTING_MODE in checkSubscription.ts
+ */
+const TESTING_MODE = process.env.NEXT_PUBLIC_TESTING_MODE === "true";
+
 interface CheckoutButtonProps {
   plan: "PRO" | "PLUS";
   highlighted?: boolean;
@@ -22,6 +28,11 @@ export function CheckoutButton({ plan, highlighted, children }: CheckoutButtonPr
   const [error, setError] = useState<string | null>(null);
 
   const handleCheckout = async () => {
+    // Prevent checkout during testing mode
+    if (TESTING_MODE) {
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
 
@@ -54,6 +65,24 @@ export function CheckoutButton({ plan, highlighted, children }: CheckoutButtonPr
       setIsLoading(false);
     }
   };
+
+  // In testing mode, show disabled button with special text
+  if (TESTING_MODE) {
+    return (
+      <div className="w-full">
+        <Button
+          disabled
+          className={`w-full opacity-60 cursor-not-allowed ${highlighted ? "bg-blue-600" : ""}`}
+          variant={highlighted ? "default" : "outline"}
+        >
+          🧪 Plus Active (Testing)
+        </Button>
+        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 text-center">
+          Payments disabled during testing
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

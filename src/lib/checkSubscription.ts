@@ -7,6 +7,12 @@ import prisma from "@/lib/prisma";
 import type { Plan, User } from "@/generated/prisma/client";
 
 /**
+ * Testing mode flag - when enabled, all users get Plus plan features
+ * Set TESTING_MODE=true in .env.local to enable
+ */
+export const TESTING_MODE = process.env.TESTING_MODE === "true";
+
+/**
  * Subscription check result type
  */
 export interface SubscriptionStatus {
@@ -77,6 +83,20 @@ export async function checkSubscription(): Promise<SubscriptionStatus> {
   }
 
   const plan = user.plan;
+  
+  // In testing mode, grant Plus plan features to all authenticated users
+  if (TESTING_MODE) {
+    return {
+      user,
+      isProOrPlus: true,
+      isPlus: true,
+      isPro: false,
+      isFree: false,
+      isAuthenticated: true,
+      plan: "PLUS" as Plan, // Report as PLUS in testing mode
+    };
+  }
+  
   const isPlus = plan === "PLUS";
   const isPro = plan === "PRO";
   const isFree = plan === "FREE";
