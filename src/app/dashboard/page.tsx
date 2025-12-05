@@ -168,6 +168,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </p>
             </Link>
 
+            {/*
             {isProOrPlus ? (
               <Link
                 href="/summarize"
@@ -191,6 +192,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </p>
               </Link>
             )}
+            */}
 
             <Link
               href="/profile"

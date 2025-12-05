@@ -9,7 +9,7 @@ import {
   summarizePaperText,
   SummarizationError,
   type PaperSummary,
-} from "@/lib/openai";
+} from "@/lib/gemini";
 import { fetchSimilarPapersForRAG, upsertPaperEmbedding } from "@/lib/vector";
 import { getPlanLimits, isUnlimited, PlanError, PlanErrorCode } from "@/lib/plans";
 import { assertCanSummarize } from "@/lib/plan-assertions";
@@ -403,14 +403,14 @@ export async function POST(
         // Capture AI errors
         captureAIError(error, {
           operation: "summarize_paper",
-          model: "gpt-4o-mini",
+          model: "gemini-pro",
           userId: user.id,
         });
 
         // Map error codes to HTTP status codes
-        const statusCode = error.code.startsWith("OPENAI_429")
+        const statusCode = error.code.startsWith("OPENAI_429") || error.code === "RATE_LIMITED"
           ? 429
-          : error.code.startsWith("OPENAI_")
+          : error.code.startsWith("OPENAI_") || error.code.startsWith("GEMINI_")
           ? 502
           : 500;
 

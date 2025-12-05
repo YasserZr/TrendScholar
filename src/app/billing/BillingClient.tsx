@@ -148,7 +148,7 @@ export function BillingClient({
               Testing Mode Active
             </CardTitle>
             <CardDescription className="text-amber-600 dark:text-amber-300">
-              You have full access to all <strong>Plus plan features</strong> during our testing phase.
+              TrendScholar is currently in development. You have full access to all <strong>Plus plan features</strong> during our testing phase.
               Payments and plan changes are temporarily disabled. Enjoy exploring all premium features for free!
             </CardDescription>
           </CardHeader>

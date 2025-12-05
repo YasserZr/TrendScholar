@@ -31,7 +31,7 @@ export function TestingBanner() {
         <BeakerIcon className="h-5 w-5 shrink-0" />
         <p className="text-sm font-medium text-center">
           <span className="font-bold">🎉 Testing Mode Active:</span>{" "}
-          All users have <span className="underline decoration-2">Plus plan features</span> enabled for free during our testing phase. Payments are temporarily disabled.
+          TrendScholar is currently in development. All users have <span className="underline decoration-2">Plus plan features</span> enabled for free during our testing phase. Payments are temporarily disabled.
         </p>
         <button
           onClick={() => setIsDismissed(true)}

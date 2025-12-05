@@ -30,7 +30,7 @@ export function GenerateSummaryButton({ paperId }: GenerateSummaryButtonProps) {
 
       if (!response.ok) {
         // Handle specific error codes
-        if (data.code === "OPENAI_ERROR" || data.code === "MODEL_ERROR") {
+        if (data.code === "GEMINI_ERROR" || data.code === "OPENAI_ERROR" || data.code === "MODEL_ERROR") {
           setError("AI service temporarily unavailable. Please try again later.");
         } else if (data.code === "RATE_LIMIT_EXCEEDED") {
           setError("Daily summary limit reached. Try again tomorrow.");

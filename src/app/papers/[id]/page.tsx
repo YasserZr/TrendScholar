@@ -6,7 +6,7 @@ import { getServerSession } from "next-auth";
 import { AuthHeader, Footer } from "@/components/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PaperActions, PaperSummary, RelatedPapers, GenerateSummaryButton } from "@/components/papers";
+import { PaperActions, PaperSummary, RelatedPapers, GenerateSummaryButton, PaperChatSection } from "@/components/papers";
 import { getPaperById, getRelatedPapers, isPaperSavedByUser } from "@/lib/papers";
 import { authOptions } from "@/lib/auth";
 import type { Metadata } from "next";
@@ -277,6 +277,17 @@ export default async function PaperPage({ params }: PaperPageProps) {
                 </dl>
               </CardContent>
             </Card>
+
+            {/* AI Chat Section */}
+            {session?.user && (
+              <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                  AI Research Assistant
+                </h2>
+                <PaperChatSection paperId={paper.id} paperTitle={paper.title} />
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}

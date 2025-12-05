@@ -29,6 +29,13 @@ enum SummaryStatus {
   FAILED
 }
 
+/// Message role in chat
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
 /// Stripe subscription status (synced from webhooks)
 enum SubscriptionStatus {
   ACTIVE
@@ -121,6 +128,7 @@ model User {
   savedPapers    SavedPaper[]
   summaries      Summary[]
   topicsFollowed UserTopic[]
+  chats          Chat[]
 
   @@index([plan])
   @@index([stripeCustomerId])
@@ -171,6 +179,7 @@ model Paper {
   // Relations
   summaries    Summary[]
   savedByUsers SavedPaper[]
+  chats        Chat[]
 
   @@index([arxivId])
   @@index([publishedAt])
@@ -237,4 +246,54 @@ model UserTopic {
   @@unique([userId, topicId])
   @@index([userId])
   @@index([topicId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chat & AI Conversation Models
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Chat conversation with AI about research papers
+model Chat {
+  id    String  @id @default(cuid())
+  title String? /// Optional title (auto-generated from first message or user-provided)
+
+  /// Associated paper for context (optional)
+  paperId String?
+  paper   Paper?  @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Metadata (e.g., model used, settings)
+  metadata Json?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  messages Message[]
+
+  @@index([userId])
+  @@index([paperId])
+  @@index([createdAt])
+}
+
+/// Individual message in a chat conversation
+model Message {
+  id      String      @id @default(cuid())
+  role    MessageRole
+  content String      @db.Text
+
+  /// Token usage for this message
+  promptTokens     Int @default(0)
+  completionTokens Int @default(0)
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([chatId])
+  @@index([createdAt])
 }

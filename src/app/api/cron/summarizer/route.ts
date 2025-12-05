@@ -8,7 +8,7 @@ import {
   summarizePaperText,
   SummarizationError,
   type PaperSummary,
-} from "@/lib/openai";
+} from "@/lib/gemini";
 import { fetchSimilarPapersForRAG } from "@/lib/vector";
 import { createCronLogger } from "@/lib/log";
 import { captureCronError, captureAIError, addBreadcrumb, flush } from "@/lib/sentry";
@@ -25,7 +25,7 @@ export const maxDuration = 300; // 5 minutes max for Vercel Pro
  * 
  * Batch Strategy:
  * - Process papers in small batches to stay within serverless limits
- * - Each summarization takes ~3-5 seconds (OpenAI API call)
+ * - Each summarization takes ~3-5 seconds (Gemini API call)
  * - With 5 min limit and 4 sec avg: max ~75 papers per run
  * - Use conservative batch size to leave room for retries and overhead
  */

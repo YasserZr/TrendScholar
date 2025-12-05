@@ -3,7 +3,7 @@
 // Supports upsert, search, and RAG-style retrieval
 
 import { QdrantClient } from "@qdrant/js-client-rest";
-import { openai } from "./openai";
+import { generateEmbedding as geminiGenerateEmbedding, generateEmbeddings as geminiGenerateEmbeddings, EMBEDDING_CONFIG } from "./gemini";
 import prisma from "./prisma";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,17 +13,15 @@ import prisma from "./prisma";
 /**
  * Vector configuration
  * 
- * Embedding Model: text-embedding-3-small
- * - 1536 dimensions
+ * Embedding Model: Google text-embedding-004
+ * - 768 dimensions
  * - Cost-effective for large datasets
  * - Good performance for academic text
- * 
- * Alternative: text-embedding-3-large (3072 dims, better quality, higher cost)
  */
 export const VECTOR_CONFIG = {
-  // OpenAI embedding model
-  embeddingModel: "text-embedding-3-small" as const,
-  embeddingDimensions: 1536,
+  // Gemini embedding model
+  embeddingModel: EMBEDDING_CONFIG.model,
+  embeddingDimensions: EMBEDDING_CONFIG.dimensions,
   
   // Qdrant collection settings
   collectionName: "papers",
@@ -110,7 +108,7 @@ export class VectorError extends Error {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Generate embedding vector for text using OpenAI
+ * Generate embedding vector for text using Gemini
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!text?.trim()) {
@@ -118,21 +116,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   try {
-    const response = await openai.embeddings.create({
-      model: VECTOR_CONFIG.embeddingModel,
-      input: text.trim(),
-    });
-
-    const embedding = response.data[0]?.embedding;
-
-    if (!embedding || embedding.length !== VECTOR_CONFIG.embeddingDimensions) {
-      throw new VectorError(
-        `Invalid embedding dimensions: expected ${VECTOR_CONFIG.embeddingDimensions}, got ${embedding?.length}`,
-        "INVALID_EMBEDDING"
-      );
-    }
-
-    return embedding;
+    return await geminiGenerateEmbedding(text);
   } catch (error) {
     if (error instanceof VectorError) throw error;
     
@@ -151,12 +135,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (!texts.length) return [];
 
   try {
-    const response = await openai.embeddings.create({
-      model: VECTOR_CONFIG.embeddingModel,
-      input: texts.map((t) => t.trim()),
-    });
-
-    return response.data.map((d) => d.embedding);
+    return await geminiGenerateEmbeddings(texts);
   } catch (error) {
     throw new VectorError(
       "Failed to generate batch embeddings",
