@@ -21,7 +21,12 @@ function createPrismaClient(): PrismaClient {
     throw new Error("DATABASE_URL environment variable is not set");
   }
   
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({ 
+    connectionString,
+    ssl: {
+      rejectUnauthorized: false, // Required for Supabase pooler connections
+    },
+  });
   const adapter = new PrismaPg(pool);
   
   return new PrismaClient({ adapter }) as unknown as PrismaClient;
