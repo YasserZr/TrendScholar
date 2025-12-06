@@ -220,19 +220,17 @@ export default async function PaperPage({ params }: PaperPageProps) {
                 </h2>
                 <PaperSummary summary={paper.summary} />
               </div>
+            ) : session?.user ? (
+              <GenerateSummaryButton paperId={paper.id} />
             ) : (
               <Card className="border-dashed">
                 <CardContent className="py-8 text-center">
                   <p className="text-muted-foreground mb-4">
                     No AI summary available for this paper yet.
                   </p>
-                  {session?.user ? (
-                    <GenerateSummaryButton paperId={paper.id} />
-                  ) : (
-                    <Button asChild variant="outline">
-                      <Link href="/auth/signin">Sign in to generate</Link>
-                    </Button>
-                  )}
+                  <Button asChild variant="outline">
+                    <Link href="/auth/signin">Sign in to generate</Link>
+                  </Button>
                 </CardContent>
               </Card>
             )}

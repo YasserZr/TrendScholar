@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { SparklesIcon } from "@heroicons/react/24/outline";
 import { PaperSummary } from "./PaperSummary";
 import type { ParsedSummary } from "@/lib/papers";
@@ -81,18 +82,25 @@ export function GenerateSummaryButton({ paperId }: GenerateSummaryButtonProps) {
 
   // Show the generate button
   return (
-    <div className="flex flex-col items-center gap-2">
-      <Button
-        onClick={handleGenerateSummary}
-        disabled={isLoading}
-        className="gap-2"
-      >
-        <SparklesIcon className="h-4 w-4" />
-        {isLoading ? "Generating..." : "Generate Summary"}
-      </Button>
-      {error && (
-        <p className="text-sm text-destructive text-center">{error}</p>
-      )}
-    </div>
+    <Card className="border-dashed">
+      <CardContent className="py-8 text-center">
+        <p className="text-muted-foreground mb-4">
+          No AI summary available for this paper yet.
+        </p>
+        <div className="flex flex-col items-center gap-2">
+          <Button
+            onClick={handleGenerateSummary}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <SparklesIcon className="h-4 w-4" />
+            {isLoading ? "Generating..." : "Generate Summary"}
+          </Button>
+          {error && (
+            <p className="text-sm text-destructive text-center">{error}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
