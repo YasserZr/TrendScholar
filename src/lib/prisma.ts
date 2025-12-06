@@ -34,8 +34,8 @@ function createPrismaClient(): PrismaClient {
     ssl: {
       rejectUnauthorized: false, // Accept self-signed certificates from Supabase pooler
     },
-    max: 20, // Maximum pool connections
-    idleTimeoutMillis: 30000,
+    max: 1, // Limit to 1 connection for Supabase Session mode (serverless)
+    idleTimeoutMillis: 0, // Disconnect immediately after query
     connectionTimeoutMillis: 10000,
   });
   
