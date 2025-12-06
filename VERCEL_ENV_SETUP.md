@@ -31,12 +31,19 @@ Make sure these are set in Vercel:
 - `NEXTAUTH_SECRET` - Same as in .env.local
 - `GITHUB_ID` - GitHub OAuth App ID
 - `GITHUB_SECRET` - GitHub OAuth App Secret
+- `EMAIL_SERVER_HOST` - SMTP server host (e.g., smtp.resend.com)
+- `EMAIL_SERVER_PORT` - SMTP port (usually 587)
+- `EMAIL_SERVER_USER` - SMTP username
+- `EMAIL_SERVER_PASSWORD` - SMTP password or API key
+- `EMAIL_FROM` - Sender email address (e.g., noreply@trendscholar.com)
 - `GEMINI_API_KEY` - Google AI API Key
 - `QDRANT_URL` - Qdrant vector database URL
 - `QDRANT_API_KEY` - Qdrant API key
 - `TESTING_MODE` - "true" or "false"
 - `NEXT_PUBLIC_TESTING_MODE` - Same as TESTING_MODE
 - `CRON_SECRET` - Secret for cron job authentication
+
+**Note:** See `EMAIL_SETUP.md` for detailed email configuration instructions.
 
 ### How to Add in Vercel
 
