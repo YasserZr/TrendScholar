@@ -30,7 +30,7 @@ const plans = [
   },
   {
     name: "PRO" as const,
-    price: "$9",
+    price: "$0",
     period: "/month",
     description: "For serious researchers",
     features: [
@@ -46,7 +46,7 @@ const plans = [
   },
   {
     name: "PLUS" as const,
-    price: "$29",
+    price: "$0",
     period: "/month",
     description: "For teams and power users",
     features: [

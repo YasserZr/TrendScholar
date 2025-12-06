@@ -22,10 +22,10 @@ describe("PLANS constant", () => {
   });
 
   it("should have correct price for each plan", () => {
-    // Prices are stored as strings like "$0", "$9", "$19"
+    // Prices are stored as strings like "$0"
     expect(PLANS.FREE.price).toBe("$0");
-    expect(PLANS.PRO.price).toBe("$9");
-    expect(PLANS.PLUS.price).toBe("$19");
+    expect(PLANS.PRO.price).toBe("$0");
+    expect(PLANS.PLUS.price).toBe("$0");
   });
 
   it("should have features defined for each plan", () => {

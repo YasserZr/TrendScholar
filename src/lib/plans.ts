@@ -118,7 +118,7 @@ export const PLANS: Record<PlanEnum, PlanConfig> = {
   },
   PRO: {
     name: "Pro",
-    price: "$9",
+    price: "$0",
     period: "per month",
     description: "For researchers who need more power",
     featureList: [
@@ -153,7 +153,7 @@ export const PLANS: Record<PlanEnum, PlanConfig> = {
   },
   PLUS: {
     name: "Plus",
-    price: "$19",
+    price: "$0",
     period: "per month",
     description: "Unlimited access for power users",
     featureList: [
