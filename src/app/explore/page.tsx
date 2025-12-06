@@ -31,7 +31,7 @@ async function getTopics(): Promise<TopicResponse[]> {
     // Fetch topics directly from database to avoid localhost fetch issues
     const topics = await prisma.topic.findMany({
       orderBy: {
-        paperCount: "desc",
+        updatedAt: "desc",
       },
       take: 50, // Limit to top 50 topics
       select: {
@@ -40,13 +40,22 @@ async function getTopics(): Promise<TopicResponse[]> {
         slug: true,
         description: true,
         keywords: true,
-        paperCount: true,
         trendData: true,
+        _count: {
+          select: {
+            papers: true,
+          },
+        },
       },
     });
 
     return topics.map((topic) => ({
-      ...topic,
+      id: topic.id,
+      name: topic.name,
+      slug: topic.slug,
+      description: topic.description,
+      keywords: topic.keywords,
+      paperCount: topic._count.papers,
       trendData: topic.trendData as TrendDataPoint[] | null,
     }));
   } catch (error) {
