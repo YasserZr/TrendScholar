@@ -80,14 +80,18 @@ export async function getFeedPapers(options: {
   const defaultTimeRange = TESTING_MODE ? "all" : "week";
   const { userId, timeRange = defaultTimeRange, topicIds, page = 1, limit = 10 } = options;
 
-  // Get user's followed topics if no specific topics provided
-  let followedTopicIds = topicIds;
-  if (!followedTopicIds || followedTopicIds.length === 0) {
+  // Determine which topics to filter by
+  // If topicIds is explicitly provided (even as empty array from URL), respect that choice
+  // If topicIds is undefined, fall back to user's followed topics
+  let topicsToFilterBy: string[] | undefined = topicIds;
+  
+  if (topicsToFilterBy === undefined) {
+    // No explicit topic filter - use followed topics as default
     const userTopics = await prisma.userTopic.findMany({
       where: { userId },
       select: { topicId: true },
     });
-    followedTopicIds = userTopics.map((ut) => ut.topicId);
+    topicsToFilterBy = userTopics.map((ut) => ut.topicId);
   }
 
   // Build date filter
@@ -110,9 +114,10 @@ export async function getFeedPapers(options: {
     whereClause.publishedAt = { gte: dateThreshold };
   }
 
-  // Add topic filter (if user follows topics) - skip in testing mode to show all papers
-  if (!TESTING_MODE && followedTopicIds && followedTopicIds.length > 0) {
-    whereClause.topicId = { in: followedTopicIds };
+  // Add topic filter - apply if topics are specified (either from URL or followed topics)
+  // If topicsToFilterBy is empty array, no topic filter is applied (show all topics)
+  if (topicsToFilterBy && topicsToFilterBy.length > 0) {
+    whereClause.topicId = { in: topicsToFilterBy };
   }
 
   // Get user's saved papers for marking
