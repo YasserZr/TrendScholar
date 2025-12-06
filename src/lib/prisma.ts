@@ -23,11 +23,8 @@ function createPrismaClient(): PrismaClient {
   
   const pool = new Pool({ 
     connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? {
+    ssl: {
       rejectUnauthorized: false, // Required for Supabase pooler with self-signed certs
-      sslmode: 'require',
-    } : {
-      rejectUnauthorized: false,
     },
     max: 20, // Maximum pool connections
     idleTimeoutMillis: 30000,
