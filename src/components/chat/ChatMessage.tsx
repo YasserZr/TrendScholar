@@ -1,6 +1,7 @@
 // src/components/chat/ChatMessage.tsx
 "use client";
 
+import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 
 interface ChatMessageProps {
@@ -44,11 +45,57 @@ export function ChatMessage({ role, content, timestamp }: ChatMessageProps) {
             </span>
           )}
         </div>
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+        {isUser ? (
+          <div className="text-sm leading-relaxed whitespace-pre-wrap">
             {content}
-          </p>
-        </div>
+          </div>
+        ) : (
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h1 className="text-lg font-bold mt-3 mb-2">{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-base font-bold mt-3 mb-2">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>
+                ),
+                p: ({ children }) => (
+                  <p className="mb-2 text-sm leading-relaxed">{children}</p>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc list-inside mb-2 space-y-1 text-sm">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal list-inside mb-2 space-y-1 text-sm">{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li className="ml-2">{children}</li>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold">{children}</strong>
+                ),
+                em: ({ children }) => (
+                  <em className="italic">{children}</em>
+                ),
+                code: ({ children }) => (
+                  <code className="bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-xs font-mono">
+                    {children}
+                  </code>
+                ),
+                pre: ({ children }) => (
+                  <pre className="bg-gray-200 dark:bg-gray-800 p-2 rounded mb-2 overflow-x-auto text-xs">
+                    {children}
+                  </pre>
+                ),
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );

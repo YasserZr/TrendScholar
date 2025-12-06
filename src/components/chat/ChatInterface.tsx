@@ -106,17 +106,58 @@ export function ChatInterface({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-8">
-            <p className="text-sm">
+            <p className="text-sm mb-4">
               Start a conversation by asking a question about this paper.
             </p>
-            <div className="mt-4 space-y-2 text-xs">
-              <p className="font-semibold">Example questions:</p>
-              <ul className="space-y-1">
-                <li>• What are the main findings of this paper?</li>
-                <li>• How does this methodology compare to previous work?</li>
-                <li>• What are the limitations of this study?</li>
-                <li>• Can you explain the key concepts in simpler terms?</li>
-              </ul>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-2xl mx-auto">
+              <button
+                onClick={() => handleSendMessage("What are the main contributions of this paper?")}
+                disabled={isLoading}
+                className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="font-medium">📊 Main Contributions</span>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">What are the main contributions of this paper?</p>
+              </button>
+              <button
+                onClick={() => handleSendMessage("Can you explain the methodology used in simple terms?")}
+                disabled={isLoading}
+                className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="font-medium">🔬 Methodology</span>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">Explain the methodology in simple terms</p>
+              </button>
+              <button
+                onClick={() => handleSendMessage("What are the key findings and results?")}
+                disabled={isLoading}
+                className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="font-medium">✨ Key Findings</span>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">What are the key findings and results?</p>
+              </button>
+              <button
+                onClick={() => handleSendMessage("What are the limitations and potential future work?")}
+                disabled={isLoading}
+                className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="font-medium">⚠️ Limitations</span>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">What are the limitations and future work?</p>
+              </button>
+              <button
+                onClick={() => handleSendMessage("How does this compare to previous related work?")}
+                disabled={isLoading}
+                className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="font-medium">🔄 Related Work</span>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">How does this compare to related work?</p>
+              </button>
+              <button
+                onClick={() => handleSendMessage("What are the practical applications of this research?")}
+                disabled={isLoading}
+                className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="font-medium">💡 Applications</span>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">What are the practical applications?</p>
+              </button>
             </div>
           </div>
         )}
