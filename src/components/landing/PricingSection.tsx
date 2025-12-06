@@ -31,7 +31,7 @@ const tiers = [
   {
     name: "Pro",
     id: "PRO",
-    price: "$9",
+    price: "$0",
     period: "/month",
     description: "For researchers who want AI-powered insights.",
     features: [
@@ -48,7 +48,7 @@ const tiers = [
   {
     name: "Plus",
     id: "PLUS",
-    price: "$19",
+    price: "$0",
     period: "/month",
     description: "For power users and research teams.",
     features: [
