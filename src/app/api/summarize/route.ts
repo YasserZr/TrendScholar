@@ -281,51 +281,10 @@ export async function POST(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 6. Check for Existing Summary (unless regenerate=true)
+    // 6. Always Generate Fresh Summary (No Caching)
     // ─────────────────────────────────────────────────────────────────────────
-    if (!regenerate) {
-      const existingSummary = await prisma.summary.findFirst({
-        where: {
-          paperId: paper.id,
-          userId: user.id,
-          status: "COMPLETED",
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (existingSummary) {
-        const parsed = parseSummaryContent(existingSummary.content);
-        
-        // Return existing summary without counting against rate limit
-        return NextResponse.json({
-          success: true,
-          summary: {
-            id: existingSummary.id,
-            tldr: parsed?.tldr ?? existingSummary.content,
-            contributions: parsed?.contributions ?? [],
-            keywords: parsed?.keywords ?? [],
-            status: existingSummary.status,
-            model: existingSummary.model,
-            createdAt: existingSummary.createdAt.toISOString(),
-          },
-          paper: {
-            id: paper.id,
-            title: paper.title,
-            arxivId: paper.arxivId,
-          },
-          usage: {
-            promptTokens: existingSummary.promptTokens,
-            completionTokens: existingSummary.completionTokens,
-            totalTokens: existingSummary.promptTokens + existingSummary.completionTokens,
-          },
-          rateLimit: {
-            limit: rateLimitInfo.limit,
-            remaining: rateLimitInfo.remaining,
-            resetsAt: getRateLimitResetTime().toISOString(),
-          },
-        });
-      }
-    }
+    // Note: Summaries are generated dynamically per request and not persisted
+    // This allows the AI to produce fresh, potentially different responses each time
 
     // ─────────────────────────────────────────────────────────────────────────
     // 7. Fetch Full PDF Text (if available)
@@ -432,19 +391,10 @@ export async function POST(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 10. Save Summary to Database
+    // 10. Skip Database Persistence (Dynamic Generation Only)
     // ─────────────────────────────────────────────────────────────────────────
-    const summaryRecord = await prisma.summary.create({
-      data: {
-        content: formatSummaryContent(result.summary),
-        status: "COMPLETED",
-        model: result.model,
-        promptTokens: result.usage.promptTokens,
-        completionTokens: result.usage.completionTokens,
-        paperId: paper.id,
-        userId: user.id,
-      },
-    });
+    // Note: Summaries are NOT saved to the database to allow fresh generation each time
+    // This means each request will produce a new, potentially different summary
 
     // ─────────────────────────────────────────────────────────────────────────
     // 11. Upsert Paper Embedding (async, non-blocking)
@@ -480,24 +430,15 @@ export async function POST(
       {
         success: true,
         summary: {
-          id: summaryRecord.id,
+          id: `temp-${Date.now()}`, // Temporary ID since not saved to DB
           tldr: result.summary.tldr,
           contributions: result.summary.contributions,
           keywords: result.summary.keywords,
-          status: summaryRecord.status,
-          model: summaryRecord.model,
-          createdAt: summaryRecord.createdAt.toISOString(),
+          status: "COMPLETED",
+          model: result.model,
+          createdAt: new Date().toISOString(),
         },
-        paper: {
-          id: paper.id,
-          title: paper.title,
-          arxivId: paper.arxivId,
-        },
-        usage: {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          totalTokens: result.usage.totalTokens,
-        },
+        totalTokens: result.usage.totalTokens,
         rateLimit: {
           limit: rateLimitInfo.limit,
           remaining: isUnlimited(rateLimitInfo.limit) ? -1 : Math.max(0, rateLimitInfo.remaining - 1), // -1 for this request

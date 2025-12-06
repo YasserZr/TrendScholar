@@ -160,6 +160,10 @@ export async function ensureCollection(): Promise<void> {
     );
 
     if (!exists) {
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[vector] Creating collection: ${VECTOR_CONFIG.collectionName} with ${VECTOR_CONFIG.embeddingDimensions} dimensions`);
+      }
+
       await qdrant.createCollection(VECTOR_CONFIG.collectionName, {
         vectors: {
           size: VECTOR_CONFIG.embeddingDimensions,
@@ -177,8 +181,29 @@ export async function ensureCollection(): Promise<void> {
       });
 
       console.log(`[vector] Created collection: ${VECTOR_CONFIG.collectionName}`);
+    } else if (process.env.NODE_ENV === "development") {
+      // Verify collection configuration
+      const collectionInfo = await qdrant.getCollection(VECTOR_CONFIG.collectionName);
+      const vectorConfig = collectionInfo.config.params.vectors;
+      const actualSize = typeof vectorConfig === 'object' && 'size' in vectorConfig ? vectorConfig.size : vectorConfig;
+      
+      console.log(`[vector] Collection exists:`, {
+        name: VECTOR_CONFIG.collectionName,
+        vectorSize: actualSize,
+        expectedSize: VECTOR_CONFIG.embeddingDimensions,
+        pointsCount: collectionInfo.points_count,
+        mismatch: actualSize !== VECTOR_CONFIG.embeddingDimensions,
+      });
+      
+      if (actualSize !== VECTOR_CONFIG.embeddingDimensions) {
+        console.warn(`[vector] ⚠️ DIMENSION MISMATCH! Collection has ${actualSize} dimensions but we're using ${VECTOR_CONFIG.embeddingDimensions}`);
+        console.warn(`[vector] To fix: Delete the collection in Qdrant dashboard and let it recreate with correct dimensions`);
+      }
     }
   } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[vector] ensureCollection error:", error);
+    }
     throw new VectorError(
       "Failed to ensure collection exists",
       "COLLECTION_ERROR",
@@ -383,15 +408,58 @@ export async function searchSimilarPapers(options: {
   }
 
   try {
-    const results = await qdrant.search(VECTOR_CONFIG.collectionName, {
+    // Ensure collection exists before searching
+    try {
+      await ensureCollection();
+      
+      // Check if collection has any points - if empty, return early
+      const collectionInfo = await qdrant.getCollection(VECTOR_CONFIG.collectionName);
+      if (collectionInfo.points_count === 0) {
+        if (process.env.NODE_ENV === "development") {
+          console.log("[vector] Collection is empty, skipping search");
+        }
+        return [];
+      }
+    } catch (collectionError) {
+      // If collection setup fails, return empty results rather than breaking
+      if (process.env.NODE_ENV === "development") {
+        console.error("[vector] Collection setup failed, skipping search:", collectionError);
+      }
+      return [];
+    }
+
+    // Build search request - start simple to avoid Qdrant compatibility issues
+    const searchRequest: {
+      vector: number[];
+      limit: number;
+      with_payload?: boolean;
+      filter?: unknown;
+    } = {
       vector: queryEmbedding,
       limit: Math.min(topK, VECTOR_CONFIG.maxTopK),
-      filter: Object.keys(filter).length > 0 ? filter : undefined,
       with_payload: true,
-      score_threshold: minScore,
-    });
+    };
 
-    return results.map((result) => ({
+    // Only add filter if it has conditions (and format properly for Qdrant)
+    if (Object.keys(filter).length > 0) {
+      searchRequest.filter = filter;
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[vector] Search request:", {
+        collection: VECTOR_CONFIG.collectionName,
+        vectorDimension: queryEmbedding.length,
+        limit: searchRequest.limit,
+        hasFilter: !!searchRequest.filter,
+      });
+    }
+
+    const results = await qdrant.search(VECTOR_CONFIG.collectionName, searchRequest);
+
+    // Filter by score threshold manually since Qdrant might not support it
+    const filteredResults = results.filter((r) => r.score >= minScore);
+
+    return filteredResults.map((result) => ({
       paperId: (result.payload?.paperId as string) || String(result.id),
       score: result.score,
       metadata: {
@@ -402,11 +470,15 @@ export async function searchSimilarPapers(options: {
       },
     }));
   } catch (error) {
-    throw new VectorError(
-      "Failed to search similar papers",
-      "SEARCH_FAILED",
-      error
-    );
+    // Log the actual error for debugging
+    if (process.env.NODE_ENV === "development") {
+      console.error("[vector] Search failed:", error);
+      console.error("[vector] Query embedding dimension:", queryEmbedding.length);
+    }
+    
+    // Return empty results instead of throwing - don't break the page
+    // This handles cases where Qdrant is misconfigured, has wrong dimensions, etc.
+    return [];
   }
 }
 
@@ -419,6 +491,9 @@ export async function searchSimilarByPaperId(
   topK: number = VECTOR_CONFIG.defaultTopK
 ): Promise<SearchResult[]> {
   try {
+    // Ensure collection exists before searching
+    await ensureCollection();
+
     // Get the paper's vector from Qdrant
     const points = await qdrant.retrieve(VECTOR_CONFIG.collectionName, {
       ids: [paperId],
@@ -456,6 +531,11 @@ export async function searchSimilarByPaperId(
       }));
   } catch (error) {
     if (error instanceof VectorError) throw error;
+
+    // Log the actual error for debugging
+    if (process.env.NODE_ENV === "development") {
+      console.error("[vector] Search by ID failed:", error);
+    }
 
     throw new VectorError(
       "Failed to search similar papers by ID",

@@ -2,9 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { SparklesIcon } from "@heroicons/react/24/outline";
+import { PaperSummary } from "./PaperSummary";
+import type { ParsedSummary } from "@/lib/papers";
 
 interface GenerateSummaryButtonProps {
   paperId: string;
@@ -13,7 +14,7 @@ interface GenerateSummaryButtonProps {
 export function GenerateSummaryButton({ paperId }: GenerateSummaryButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [generatedSummary, setGeneratedSummary] = useState<ParsedSummary | null>(null);
 
   const handleGenerateSummary = async () => {
     setIsLoading(true);
@@ -42,8 +43,18 @@ export function GenerateSummaryButton({ paperId }: GenerateSummaryButtonProps) {
         return;
       }
 
-      // Success - refresh the page to show the new summary
-      router.refresh();
+      // Success - store the summary in state and display it
+      if (data.success && data.summary) {
+        setGeneratedSummary({
+          id: data.summary.id,
+          tldr: data.summary.tldr,
+          contributions: data.summary.contributions,
+          keywords: data.summary.keywords,
+          rawContent: "", // Not needed for display
+          model: data.summary.model,
+          createdAt: new Date(data.summary.createdAt),
+        });
+      }
     } catch (err) {
       console.error("Failed to generate summary:", err);
       setError("Network error. Please try again.");
@@ -52,6 +63,23 @@ export function GenerateSummaryButton({ paperId }: GenerateSummaryButtonProps) {
     }
   };
 
+  // If summary has been generated, display it
+  if (generatedSummary) {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-600" />
+          AI Summary
+        </h2>
+        <PaperSummary summary={generatedSummary} />
+        <p className="text-xs text-muted-foreground mt-4 text-center">
+          💡 This summary is generated fresh each time. Refresh the page to generate a new one.
+        </p>
+      </div>
+    );
+  }
+
+  // Show the generate button
   return (
     <div className="flex flex-col items-center gap-2">
       <Button
