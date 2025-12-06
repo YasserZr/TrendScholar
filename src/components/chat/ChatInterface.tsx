@@ -10,6 +10,7 @@ export interface Message {
   role: "USER" | "ASSISTANT";
   content: string;
   createdAt: Date;
+  isNew?: boolean; // Flag for newly received messages to trigger typing animation
 }
 
 interface ChatInterfaceProps {
@@ -122,12 +123,14 @@ export function ChatInterface({
             role: data.userMessage.role,
             content: data.userMessage.content,
             createdAt: new Date(data.userMessage.createdAt),
+            isNew: false,
           },
           {
             id: data.assistantMessage.id,
             role: data.assistantMessage.role,
             content: data.assistantMessage.content,
             createdAt: new Date(data.assistantMessage.createdAt),
+            isNew: true, // Enable typing animation for assistant response
           },
         ];
       });
@@ -216,6 +219,7 @@ export function ChatInterface({
             role={msg.role.toLowerCase() as "user" | "assistant"}
             content={msg.content}
             timestamp={msg.createdAt}
+            isStreaming={msg.isNew && msg.role === "ASSISTANT"}
           />
         ))}
 
