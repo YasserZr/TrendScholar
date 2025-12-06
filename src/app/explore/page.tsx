@@ -1,6 +1,7 @@
 import { AuthHeader, Footer } from "@/components/ui";
 import { ExploreClient } from "@/components/explore";
 import type { Metadata } from "next";
+import prisma from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Explore Topics | TrendScholar",
@@ -25,27 +26,29 @@ interface TopicResponse {
   trendData: TrendDataPoint[] | null;
 }
 
-interface TopicsApiResponse {
-  success: boolean;
-  data?: TopicResponse[];
-  error?: string;
-}
-
 async function getTopics(): Promise<TopicResponse[]> {
   try {
-    // In production, use absolute URL or fetch from API
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/topics?sortBy=paperCount&sortOrder=desc&includeTrends=true`, {
-      next: { revalidate: 3600 }, // Revalidate every hour
+    // Fetch topics directly from database to avoid localhost fetch issues
+    const topics = await prisma.topic.findMany({
+      orderBy: {
+        paperCount: "desc",
+      },
+      take: 50, // Limit to top 50 topics
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        keywords: true,
+        paperCount: true,
+        trendData: true,
+      },
     });
 
-    if (!response.ok) {
-      console.error("Failed to fetch topics:", response.status);
-      return [];
-    }
-
-    const data: TopicsApiResponse = await response.json();
-    return data.success && data.data ? data.data : [];
+    return topics.map((topic) => ({
+      ...topic,
+      trendData: topic.trendData as TrendDataPoint[] | null,
+    }));
   } catch (error) {
     console.error("Error fetching topics:", error);
     return [];
