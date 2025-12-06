@@ -27,7 +27,28 @@ export function PaperSummary({ summary }: PaperSummaryProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm leading-relaxed">{summary.tldr}</p>
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => (
+                    <p className="mb-3 text-sm leading-relaxed">{children}</p>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+                  ),
+                  em: ({ children }) => (
+                    <em className="italic text-gray-700 dark:text-gray-300">{children}</em>
+                  ),
+                  code: ({ children }) => (
+                    <code className="bg-blue-200 dark:bg-blue-900 px-1.5 py-0.5 rounded text-xs font-mono">
+                      {children}
+                    </code>
+                  ),
+                }}
+              >
+                {summary.tldr}
+              </ReactMarkdown>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -42,13 +63,40 @@ export function PaperSummary({ summary }: PaperSummaryProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {summary.contributions.map((contribution, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm">
-                  <span className="shrink-0 w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center justify-center text-xs font-medium">
+                <li key={index} className="flex items-start gap-3 text-sm">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex items-center justify-center text-xs font-medium mt-0.5">
                     {index + 1}
                   </span>
-                  <span className="leading-relaxed">{contribution}</span>
+                  <div className="flex-1 prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => (
+                          <p className="mb-0 text-sm leading-relaxed">{children}</p>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+                        ),
+                        em: ({ children }) => (
+                          <em className="italic text-gray-700 dark:text-gray-300">{children}</em>
+                        ),
+                        code: ({ children }) => (
+                          <code className="bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs font-mono">
+                            {children}
+                          </code>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc list-inside mt-1 space-y-0.5">{children}</ul>
+                        ),
+                        li: ({ children }) => (
+                          <li className="text-xs">{children}</li>
+                        ),
+                      }}
+                    >
+                      {contribution}
+                    </ReactMarkdown>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -103,7 +151,57 @@ export function RawSummary({ content }: { content: string }) {
       </CardHeader>
       <CardContent>
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown>{content}</ReactMarkdown>
+          <ReactMarkdown
+            components={{
+              h1: ({ children }) => (
+                <h1 className="text-lg font-bold mt-4 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">{children}</h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className="text-base font-bold mt-4 mb-2">{children}</h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="text-sm font-semibold mt-3 mb-2">{children}</h3>
+              ),
+              p: ({ children }) => (
+                <p className="mb-3 text-sm leading-relaxed">{children}</p>
+              ),
+              ul: ({ children }) => (
+                <ul className="list-disc list-inside mb-3 space-y-1.5 text-sm">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="list-decimal list-inside mb-3 space-y-1.5 text-sm">{children}</ol>
+              ),
+              li: ({ children }) => (
+                <li className="ml-2 leading-relaxed">{children}</li>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
+              ),
+              em: ({ children }) => (
+                <em className="italic text-gray-700 dark:text-gray-300">{children}</em>
+              ),
+              code: ({ children }) => (
+                <code className="bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded text-xs font-mono">
+                  {children}
+                </code>
+              ),
+              pre: ({ children }) => (
+                <pre className="bg-gray-200 dark:bg-gray-800 p-3 rounded-lg mb-3 overflow-x-auto text-xs">
+                  {children}
+                </pre>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-3 bg-blue-50 dark:bg-blue-950/30 rounded-r text-sm italic">
+                  {children}
+                </blockquote>
+              ),
+              hr: () => (
+                <hr className="my-4 border-gray-300 dark:border-gray-700" />
+              ),
+            }}
+          >
+            {content}
+          </ReactMarkdown>
         </div>
       </CardContent>
     </Card>
