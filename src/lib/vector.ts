@@ -433,7 +433,7 @@ export async function searchSimilarPapers(options: {
       vector: number[];
       limit: number;
       with_payload?: boolean;
-      filter?: unknown;
+      filter?: Record<string, unknown>;
     } = {
       vector: queryEmbedding,
       limit: Math.min(topK, VECTOR_CONFIG.maxTopK),
@@ -442,7 +442,7 @@ export async function searchSimilarPapers(options: {
 
     // Only add filter if it has conditions (and format properly for Qdrant)
     if (Object.keys(filter).length > 0) {
-      searchRequest.filter = filter;
+      searchRequest.filter = filter as Record<string, unknown>;
     }
 
     if (process.env.NODE_ENV === "development") {
