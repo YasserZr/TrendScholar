@@ -35,6 +35,54 @@ export function ChatInterface({
     scrollToBottom();
   }, [messages]);
 
+  // Generate context-aware suggested prompts based on conversation
+  const getSuggestedPrompts = (): string[] => {
+    if (messages.length === 0) {
+      return [
+        "What are the main contributions?",
+        "Explain the methodology",
+        "Summarize the key findings",
+      ];
+    }
+
+    const lastMessage = messages[messages.length - 1];
+    const lastContent = lastMessage.content.toLowerCase();
+
+    // Context-aware suggestions based on last message
+    if (lastContent.includes("contribution") || lastContent.includes("finding")) {
+      return [
+        "How does this compare to related work?",
+        "What are the limitations?",
+        "What are practical applications?",
+      ];
+    }
+
+    if (lastContent.includes("method") || lastContent.includes("approach")) {
+      return [
+        "What are the results?",
+        "What datasets were used?",
+        "Can you explain in simpler terms?",
+      ];
+    }
+
+    if (lastContent.includes("limitation") || lastContent.includes("future")) {
+      return [
+        "How significant is this work?",
+        "What problems does this solve?",
+        "Who would benefit from this?",
+      ];
+    }
+
+    // Default follow-up suggestions
+    return [
+      "Tell me more about that",
+      "What are the implications?",
+      "Can you provide an example?",
+    ];
+  };
+
+  const suggestedPrompts = getSuggestedPrompts();
+
   const handleSendMessage = async (content: string) => {
     setIsLoading(true);
     setError(null);
@@ -203,6 +251,27 @@ export function ChatInterface({
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Suggested Prompts - shown above input */}
+      {messages.length > 0 && !isLoading && (
+        <div className="px-4 py-2 border-t bg-gray-50/50 dark:bg-gray-900/50">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+              Try asking:
+            </span>
+            {suggestedPrompts.map((prompt, index) => (
+              <button
+                key={index}
+                onClick={() => handleSendMessage(prompt)}
+                disabled={isLoading}
+                className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput onSend={handleSendMessage} disabled={isLoading} />
