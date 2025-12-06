@@ -2,6 +2,7 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
+import { parse } from "pg-connection-string";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -21,10 +22,15 @@ function createPrismaClient(): PrismaClient {
     throw new Error("DATABASE_URL environment variable is not set");
   }
   
-  // Create pool with explicit SSL configuration
-  // The ssl option in the pool config takes precedence over connection string params
-  const pool = new Pool({ 
-    connectionString,
+  // Parse the connection string and explicitly set SSL configuration
+  const config = parse(connectionString);
+  
+  const pool = new Pool({
+    host: config.host || undefined,
+    port: config.port ? parseInt(config.port) : undefined,
+    user: config.user || undefined,
+    password: config.password || undefined,
+    database: config.database || undefined,
     ssl: {
       rejectUnauthorized: false, // Accept self-signed certificates from Supabase pooler
     },
