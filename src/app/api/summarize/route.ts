@@ -438,7 +438,16 @@ export async function POST(
           model: result.model,
           createdAt: new Date().toISOString(),
         },
-        totalTokens: result.usage.totalTokens,
+        paper: {
+          id: paper.id,
+          title: paper.title,
+          arxivId: paper.arxivId,
+        },
+        usage: {
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          totalTokens: result.usage.totalTokens,
+        },
         rateLimit: {
           limit: rateLimitInfo.limit,
           remaining: isUnlimited(rateLimitInfo.limit) ? -1 : Math.max(0, rateLimitInfo.remaining - 1), // -1 for this request
